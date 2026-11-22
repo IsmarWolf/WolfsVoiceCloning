@@ -23,3 +23,6 @@ venvs/
 __pycache__/
 *.pyc
 *.log
+
+*.err
+.model-downloads/

@@ -5,6 +5,7 @@ so you can pick the EARLIEST one that sounds like you (later ones are often over
 
   python compare_checkpoints.py gptsovits --exp ismar             # English: every GPT x SoVITS pair
   python compare_checkpoints.py rvc --exp ismar                   # Portuguese: every RVC save point
+  python compare_checkpoints.py rvc --exp ismar --base-dir C:\\base   # ... using base voices you rendered yourself
   python compare_checkpoints.py f5tts --ckpt-dir C:\\...\\ckpts\\ismar_pt
   python compare_checkpoints.py rvc --exp ismar --every 2         # only every 2nd checkpoint
 
@@ -69,6 +70,9 @@ def main() -> int:
     ap.add_argument("--lang", help="test sentence language (default: en for gptsovits, pt otherwise)")
     ap.add_argument("--sentences", type=Path, help="custom test sentence file (one per line)")
     ap.add_argument("--ckpt-dir", type=Path, help="f5tts: folder with model_*.pt checkpoints")
+    ap.add_argument("--base-dir", type=Path,
+                    help="rvc: folder with one pre-rendered base .wav per test sentence (sorted by name), "
+                         "instead of rendering them with the engine from [routing]")
     ap.add_argument("--every", type=int, default=1, help="only every Nth checkpoint (the last is always kept)")
     ap.add_argument("--config", type=Path, default=narrate.DEFAULT_CONFIG)
     ap.add_argument("--out", type=Path, default=HERE / "out" / "checkpoints")
@@ -100,14 +104,17 @@ def main() -> int:
 
     elif args.engine == "rvc":
         r = cfg["rvc"]
-        models = thin([p for p in (Path(r["cwd"]) / "assets" / "weights").glob(f"{args.exp}*.pth")], args.every)
+        models = thin([p for p in (Path(r["cwd"]) / "assets" / "weights").glob(f"{args.exp}_e*.pth")], args.every)
         if not models:
             narrate.log(f"No RVC models named {args.exp}*.pth in {Path(r['cwd']) / 'assets' / 'weights'}")
             return 1
         base_engine = cfg["routing"].get(lang, "chatterbox")
-        base_dir = out_root / "_base"
+        base_dir = args.base_dir or (out_root / "_base")
         base_dir.mkdir(exist_ok=True)
         base = sorted(base_dir.glob("*.wav"))
+        if args.base_dir and len(base) != len(sentences):
+            narrate.log(f"--base-dir has {len(base)} wavs but there are {len(sentences)} test sentences")
+            return 1
         if len(base) != len(sentences):  # render the base voice once, reuse for every RVC model
             narrate.log(f"Rendering base audio with {base_engine} ...")
             with tempfile.TemporaryDirectory() as td:

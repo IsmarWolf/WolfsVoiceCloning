@@ -4,16 +4,16 @@
 Portuguese speech comes from **Chatterbox Multilingual** (zero-shot, using your reference clip) and is passed through your RVC model.
 **F5-TTS** is the backup: fine-tune it on the same clips and compare by ear.
 
-Everything goes in one folder: `C:\Users\IsmarWolf\VoiceClone\`
+Everything goes in one folder, which is also the git repo: `C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\`
 
 ```
-VoiceClone\
-  raw\            your recordings (session1_pt_01.wav, ...)
-  dataset\        output of prepare_dataset.py
-  pipeline\       prepare_dataset.py, narrate.py, voice_config.toml, engines\
-  GPT-SoVITS\     git clone
-  RVC\            git clone
-  venvs\          chatterbox, f5tts, prep
+WolfsVoiceCloning\
+  raw\            your recordings (Treino_pt_01.wav, ...)       (git-ignored)
+  dataset\        output of prepare_dataset.py                  (git-ignored)
+  RVC\            git clone of the RVC repo, with its own .venv  (git-ignored)
+  venvs\          prep, chatterbox, f5tts                       (git-ignored)
+  GPT-SoVITS\     only if you record English                    (git-ignored)
+  prepare_dataset.py  train_rvc.py  compare_checkpoints.py  narrate.py  voice_config.toml  engines\
 ```
 
 > **RTX 50-series rule:** every environment needs **PyTorch built for CUDA 12.8 or newer** (`cu128`).
@@ -25,10 +25,10 @@ VoiceClone\
 ## 0. Data prep (both languages)
 
 ```powershell
-cd C:\Users\IsmarWolf\VoiceClone
+cd C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning
 python -m venv venvs\prep
 venvs\prep\Scripts\pip install faster-whisper soundfile numpy num2words nvidia-cublas-cu12 "nvidia-cudnn-cu12==9.*"
-venvs\prep\Scripts\python pipeline\prepare_dataset.py --input raw --output dataset --speaker ismar
+venvs\prep\Scripts\python prepare_dataset.py --input raw --output dataset --speaker ismar
 ```
 
 - About 30 minutes of audio takes roughly 3–6 minutes on the GPU. If CUDA fails, it falls back to CPU, which is slower but still works.
@@ -43,7 +43,7 @@ venvs\prep\Scripts\python pipeline\prepare_dataset.py --input raw --output datas
 ### Install (about 10 GB)
 ```powershell
 # Miniconda first if you don't have it: https://docs.conda.io/en/latest/miniconda.html
-cd C:\Users\IsmarWolf\VoiceClone
+cd C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning
 git clone https://github.com/RVC-Boss/GPT-SoVITS.git
 cd GPT-SoVITS
 conda create -n GPTSoVits python=3.11 -y
@@ -62,7 +62,7 @@ In the browser (http://127.0.0.1:9874):
 1. Top of the page, **version: `v2Pro`**. Use `v2ProPlus` if VRAM allows. It's a bit better and still fits in 16 GB.
 2. Tab **1-GPT-SoVITS-TTS → 1A Dataset formatting**
    - Experiment name: `ismar`
-   - Text labelling file: `C:\Users\IsmarWolf\VoiceClone\dataset\gptsovits.list`
+   - Text labelling file: `C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\gptsovits.list`
    - Audio folder: leave **empty** (the list has full paths)
    - Click **One-click formatting** and wait for "done".
 3. **1B Fine-tuning**
@@ -82,43 +82,55 @@ Then copy the chosen weight paths into `[gptsovits]` in `voice_config.toml`. `na
 
 ## 2. RVC: your timbre, for Portuguese (MIT)
 
-RVC doesn't need transcripts, so **all** your clips (PT + EN) go in. More data gives better timbre.
+RVC doesn't need transcripts, so **all** your clips go in. More data gives better timbre.
+The current RVC repo targets **Python 3.12 + PyTorch 2.7.1 cu128**, which is exactly what an RTX 50-series card needs.
+(Older guides mention `infer-web.py`, `tools/infer_cli.py` and Python 3.10. Those no longer exist.)
 
-### Install
+### Install (about 8 GB, inside the project folder)
 ```powershell
-cd C:\Users\IsmarWolf\VoiceClone
-git clone https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI.git RVC
+cd C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning
+git clone --depth 1 https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI.git RVC
 cd RVC
-py -3.10 -m venv .venv          # RVC is happiest on Python 3.10 (install it from python.org if `py -3.10` is missing)
-.venv\Scripts\pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
-.venv\Scripts\pip install -r requirements.txt
-# then download the base models (hubert, rmvpe, pretrained_v2) as the RVC README says (tools/download_models.py)
+py -3.12 -m venv .venv
+.venv\Scripts\python -m pip install --upgrade pip setuptools wheel
+.venv\Scripts\python -m pip install torch==2.7.1+cu128 torchaudio==2.7.1+cu128 --index-url https://download.pytorch.org/whl/cu128 --extra-index-url https://pypi.org/simple
+# the requirements file points at a Chinese mirror; use the official index instead
+(Get-Content requirments_cu128_py312.txt) -replace 'https://mirrors.pku.edu.cn/pypi/simple','https://pypi.org/simple' | Set-Content $env:TEMP\rvc_req.txt
+.venv\Scripts\python -m pip install -r $env:TEMP\rvc_req.txt
 ```
-If `requirements.txt` tries to replace torch with an older build, re-run the `cu128` torch line afterwards.
-The RVC repo has a 50-series install thread: <https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI/issues/2745>.
+Then download the base models (hubert, rmvpe, the v2 40k pretrained pair, the silence samples) from `lj1995/VoiceConversionWebUI` into `RVC\assets` and `RVC\logs\mute` as the RVC README says.
 
-### Train
-`.venv\Scripts\python infer-web.py` → **Train** tab:
-- Experiment name `ismar`, target SR **40k**, pitch guidance **yes**, version **v2**
-- Training folder: `C:\Users\IsmarWolf\VoiceClone\dataset\wavs`
-- f0 method **rmvpe_gpu**, batch size **12**, total epochs **100**, save every **10**
-- "Save only the latest ckpt": **No**. "Save a small final model to the weights folder at each save point": **Yes**. That gives you `ismar_e10_….pth`, `ismar_e20_….pth` and so on in `assets\weights`.
-- Click "One-click training". It also builds the `.index` file.
-- With ~30 min of clean audio, RVC usually sounds right somewhere around epoch 40–80. Past that it tends to get harsh and lose the natural breath. Only go beyond 100 if e100 still clearly sounds unlike you.
-- After Chatterbox is installed (step 3), compare every save point:
-  ```powershell
-  python compare_checkpoints.py rvc --exp ismar
-  ```
-  This renders the Portuguese test sentences once with Chatterbox, then passes them through each RVC checkpoint.
+### Train (one command, no clicking)
+```powershell
+cd C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning
+RVC\.venv\Scripts\python.exe train_rvc.py --exp ismar --epochs 100 --save-every 10
+```
+`train_rvc.py` runs the same steps as the WebUI's Train tab: slice, pitch (rmvpe), HuBERT features, train, retrieval index.
+- Sample rate 40k, v2, batch 12. Every save point is kept as `RVC\assets\weights\ismar_e<epoch>_s<step>.pth`.
+- About 20 s per epoch on an RTX 5060 Ti with ~33 min of audio, so ~35 min for 100 epochs.
+- The index is written to `RVC\assets\indices\`.
+- Resume or redo one step: `--only train`, or `--skip preprocess f0 features`.
+- With ~30 min of clean audio RVC usually sounds right around epoch 40–80. Past that it tends to get harsh and lose the natural breath.
 
-You know RVC already. The only differences from your earlier runs are the cu128 torch and the clean dataset from step 0.
+### Pick the checkpoint
+```powershell
+python compare_checkpoints.py rvc --exp ismar
+```
+This renders the Portuguese test sentences once with the base voice, then passes them through each RVC checkpoint (see "Avoiding overtraining" below).
+
+### Convert a file with RVC by hand
+```powershell
+cd RVC
+.venv\Scripts\python -m infer.cli --model ismar_e60_s2520.pth --input C:\path\in.wav --output C:\path\out.wav --index assets\indices\<your .index> --index-rate 0.5
+```
+Use absolute paths for `--input` and `--output`: the CLI changes into the RVC folder first.
 
 ---
 
 ## 3. Chatterbox Multilingual: Portuguese speech (MIT)
 
 ```powershell
-cd C:\Users\IsmarWolf\VoiceClone
+cd C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning
 py -3.11 -m venv venvs\chatterbox
 venvs\chatterbox\Scripts\pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 venvs\chatterbox\Scripts\pip install chatterbox-tts --no-deps
@@ -175,7 +187,7 @@ Use `--every 2` to listen to fewer checkpoints at first, then fill in around the
 ## 5. Generate narration
 
 ```powershell
-cd C:\Users\IsmarWolf\VoiceClone\pipeline
+cd C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning
 python narrate.py --lang pt --text "Você sabia que 90% das pessoas fazem isso errado?" --out C:\Users\IsmarWolf\Videos\vo\hook.wav
 python narrate.py --lang en --text-file script_en.txt --out vo_en.mp3 --json
 python narrate.py --lang pt --engine f5tts --text "..." --out compare_f5.wav      # A/B test
