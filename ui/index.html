@@ -71,6 +71,15 @@
   details { margin-top: 12px; color: var(--muted); font-size: .85rem; } details summary { cursor: pointer; } details ul { margin: 8px 0 0 18px; padding: 0; }
   .vcard { border-top: 1px solid var(--line); padding: 14px 0; } .vcard:first-child { border-top: 0; padding-top: 0; }
   .vcard .vh { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .engine { margin: -2px 0 12px; padding: 10px 12px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: 10px; font-size: .82rem; line-height: 1.45; }
+  .engine .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .engine .tag { font-size: .7rem; padding: 2px 9px; border-radius: 99px; border: 1px solid rgba(255,255,255,.2); }
+  .engine .tag.good { color: var(--good); border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.12); }
+  .engine .tag.warn { color: #ffb86b; border-color: rgba(255,184,107,.45); background: rgba(255,184,107,.12); }
+  .engine .tag.bad { color: #ff7b7b; border-color: rgba(255,123,123,.45); background: rgba(255,123,123,.12); }
+  .engine .row2 { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .more { margin: 0 0 12px; font-size: .8rem; } .more summary { cursor: pointer; opacity: .8; }
+  .more .cat { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
   .badge { font-size: .7rem; padding: 2px 9px; border-radius: 99px; background: rgba(52,211,153,.15); color: var(--good); border: 1px solid rgba(52,211,153,.35); margin-left: 8px; }
   table.rank { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .84rem; } table.rank td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: middle; }
   table.rank audio { height: 32px; min-width: 160px; } .sbar { height: 6px; border-radius: 9px; background: rgba(255,255,255,.08); min-width: 70px; } .sbar i { display: block; height: 100%; border-radius: 9px; background: var(--grad); }
@@ -215,9 +224,11 @@
     <section class="card">
       <h2>Voz</h2>
       <div class="seg" id="lang"><button data-v="pt" class="on">Português</button><button data-v="en">English</button></div>
-      <label class="f">Modelo do Chatterbox
+      <label class="f">Voz base
         <select id="model"></select>
       </label>
+      <div id="engineInfo" class="engine"></div>
+      <details class="more"><summary>Outros motores que analisei (não instaláveis)</summary><div id="catalog"></div></details>
       <label class="f">Trecho de referência
         <div class="refline">
           <select id="ref"></select>
@@ -424,9 +435,10 @@ function fixCfg() {  // keep the saved settings valid for the active voice
 function applyCfg() {
   $("text").value = cfg.text || "";
   document.querySelectorAll("#lang button").forEach(b => b.classList.toggle("on", b.dataset.v === cfg.lang));
-  const models = S.models.filter(m => cfg.lang === "pt" ? true : m.key === "v3");
-  fillSelect($("model"), models.map(m => ({ v: m.key, l: m.label + (m.ready === false ? " · baixa na 1ª vez" : "") })), cfg.model);
+  const models = S.models.filter(m => m.langs.includes(cfg.lang));
+  fillSelect($("model"), models.map(m => ({ v: m.key, l: m.label + (!m.installed ? " · não instalada" : m.ready === false ? " · baixa na 1ª vez" : "") })), cfg.model);
   if (!models.some(m => m.key === cfg.model)) { cfg.model = models[0].key; $("model").value = cfg.model; }
+  renderEngine();
   $("ref").value = cfg.ref; if ($("ref").value !== cfg.ref) { cfg.ref = $("ref").value; }
   showRefText();
   SLIDERS.concat(RVC_SLIDERS, EQ_SLIDERS).forEach(s => s.sync && s.sync());
@@ -531,6 +543,8 @@ function trackJob(id, kind) {
 async function generate() {
   cfg.text = $("text").value.trim(); save();
   if (!cfg.text) { toast("Escreva algum texto.", true); return; }
+  const mm = S.models.find(x => x.key === cfg.model);
+  if (mm && !mm.installed) { toast("Instale essa voz base primeiro (botão no cartão Voz).", true); return; }
   try { const r = await api.post("/api/generate", cfg); trackJob(r.id, "generate"); } catch (e) { toast(e.message, true); }
 }
 
@@ -563,8 +577,42 @@ $("text").addEventListener("input", () => { cfg.text = $("text").value; updateCo
 $("text").addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); generate(); } });
 $("go").onclick = generate;
 $("cancel").onclick = () => job && api.post("/api/cancel", { id: job.id });
-$("lang").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; cfg.lang = b.dataset.v; cfg.model = cfg.lang === "pt" ? "ptbr" : "v3"; applyCfg(); save(); };
-$("model").onchange = () => { cfg.model = $("model").value; save(); };
+$("lang").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; cfg.lang = b.dataset.v; if (!S.models.find(m => m.key === cfg.model && m.langs.includes(cfg.lang))) cfg.model = cfg.lang === "pt" ? "ptbr" : "v3"; applyCfg(); save(); };
+$("model").onchange = () => { cfg.model = $("model").value; renderEngine(); save(); };
+
+// ---- "Voz base": licence, language and install status of each engine
+let ESU = null, engTimer = null;
+const COMM = { "sim": ["good", "uso comercial permitido"], "limitado": ["warn", "comercial com limites"], "não": ["warn", "uso não comercial"] };
+function renderEngine() {
+  const m = S.models.find(x => x.key === cfg.model); if (!m) return;
+  const c = COMM[m.commercial] || ["warn", m.commercial];
+  const st = ESU?.engines?.[m.engine];
+  const busy = ESU?.engine_running === m.engine;
+  let act = "";
+  if (!m.installed) {
+    if (busy && st) act = `<div class="row2"><span>Instalando: ${st.steps.map(r => `${esc(r.label)} (${r.state === "done" ? "ok" : r.state === "running" ? esc(r.detail || "…") : "espera"})`).join(" → ")}</span><button class="ghost small" data-cancel-eng="1">Cancelar</button></div>`;
+    else act = `<div class="row2"><button class="primary" style="font-size:.85rem;padding:8px 16px" data-install="${esc(m.engine)}">Instalar (${esc(m.size)})</button>${ESU?.error ? `<span style="color:#ff7b7b">${esc(ESU.error)}</span>` : ""}</div>`;
+  }
+  $("engineInfo").innerHTML = `<div class="tags"><span class="tag ${c[0]}">${esc(c[1])}</span><span class="tag">${esc(m.license)}</span><span class="tag ${m.tested === "sim" ? "good" : "warn"}">${m.tested === "sim" ? "testado" : m.tested === "tecnico" ? "instala e gera áudio; qualidade não avaliada" : "não testado"}</span></div>
+    <div>Português do Brasil: ${esc(m.pt_br)}.</div><div style="opacity:.8">${esc(m.note)}</div>${act}`;
+  $("sliders").style.opacity = m.engine === "chatterbox" ? 1 : .45;
+  $("catalog").innerHTML = (S.catalog || []).map(x => `<div class="cat"><b>${esc(x.label)}</b><div>Licença: ${esc(x.license)}</div><div>pt-BR: ${esc(x.pt_br)}</div><div style="opacity:.8">${esc(x.why)}</div></div>`).join("");
+}
+$("engineInfo").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.cancelEng) { api.post("/api/setup/cancel"); return; }
+  const eng = b.dataset.install; const m = S.models.find(x => x.engine === eng); if (!m) return;
+  const accept = m.commercial !== "sim" ? confirm(`${m.label}\n\nLicença: ${m.license}\nAviso: esta licença não permite uso comercial. Tudo bem para uso pessoal; quem for monetizar precisa de outra voz base.\n\nInstalar?`) : true;
+  if (!accept) return;
+  try { await api.post("/api/engine/install", { engine: eng, accept }); pollEngine(); engTimer = engTimer || setInterval(pollEngine, 2000); } catch (err) { toast(err.message, true); }
+};
+async function pollEngine() {
+  try {
+    ESU = await api.get("/api/setup");
+    if (!ESU.engine_running && engTimer) { clearInterval(engTimer); engTimer = null; await refreshState(true); }
+    renderEngine();
+  } catch (e) {}
+}
 $("ref").onchange = () => { cfg.ref = $("ref").value; showRefText(); save(); $("refAudio").pause(); };
 $("refPlay").onclick = () => { const a = $("refAudio"); if (!a.paused) { a.pause(); return; } a.src = "/file/ref/" + encodeURIComponent(cfg.ref); a.play().catch(() => {}); };
 $("refUp").onclick = () => $("refFile").click();

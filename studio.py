@@ -39,6 +39,7 @@ sys.path.insert(0, str(HERE))
 import narrate  # noqa: E402  (text normalisation, chunking, ffmpeg finishing)
 import portable  # noqa: E402  (paths, settings, active voice)
 import setup_manager as SM  # noqa: E402  (installs the environments)
+import tts_engines  # noqa: E402  (the 'Voz base' menu: models, licences)
 import voices  # noqa: E402  (the clone pipeline)
 
 portable.add_tools_to_path()
@@ -51,10 +52,7 @@ CONFIG_PATH = portable.CONFIG
 for d in (OUT, REFS, TMP, LOGS):
     d.mkdir(parents=True, exist_ok=True)
 
-MODELS = {
-    "ptbr": {"label": "Português do Brasil (modelo dedicado)", "lang": "pt"},
-    "v3": {"label": "Multilíngue v3 (23 idiomas)", "lang": "any"},
-}
+MODELS = tts_engines.MODELS
 NAME_RE = re.compile(r"^[\w.\- ()]+$")
 LOCK = threading.Lock()
 
@@ -163,6 +161,49 @@ def make_workers() -> tuple[Worker, Worker]:
 
 CB, RV = make_workers()
 
+
+def _engine_worker(eid: str) -> Worker:
+    def cmd():
+        py = portable.venv_python(portable.VENVS / eid)
+        return [str(py), "-W", "ignore", str(HERE / "engines" / f"{eid}_server.py"), str(HERE)]
+    env = {}
+    if eid == "xtts" and "xtts" in portable.read_settings().get("accepted_licenses", []):
+        env["COQUI_TOS_AGREED"] = "1"           # set only after the CPML was accepted in the menu
+    return Worker(eid, cmd, env=env)
+
+
+WORKERS = {"chatterbox": CB, "xtts": _engine_worker("xtts"), "f5": _engine_worker("f5")}
+
+
+def tts_worker(model: str) -> Worker:
+    """The worker that serves a model; the other base-voice workers are stopped to free GPU memory."""
+    eid = MODELS[model]["engine"]
+    for k, w in WORKERS.items():
+        if k != eid and w.alive():
+            w.kill()
+    w = WORKERS[eid]
+    if eid == "xtts":
+        w.env = {"COQUI_TOS_AGREED": "1"} if "xtts" in portable.read_settings().get("accepted_licenses", []) else {}
+    return w
+
+
+def model_installed(model: str) -> bool:
+    eid = MODELS[model]["engine"]
+    if eid == "chatterbox":
+        return True if model == "v3" else ptbr_ready()
+    return SM.SETUP.engine_installed(eid)
+
+
+def ref_text_of(ref_id: str) -> str:
+    """The transcript of a dataset reference clip (F5-TTS needs it); '' for uploaded clips."""
+    kind, _, name = (ref_id or "").partition(":")
+    if kind != "ds":
+        return ""
+    for r in list_refs():
+        if r["id"] == ref_id:
+            return r.get("text", "")
+    return ""
+
 # --------------------------------------------------------------------------- jobs
 JOBS: dict[str, dict] = {}
 QUEUE: "queue.Queue[str]" = queue.Queue()
@@ -213,7 +254,11 @@ def run_generate(job: dict) -> None:
     has_eq = bool(gen["post_filter"])
     lang = p["lang"]
     text = narrate.spell_numbers(p["text"], lang) if lang in ("pt", "en") else p["text"]
-    chunks = narrate.split_text(text, 250)
+    info = MODELS[p["model"]]
+    W = tts_worker(p["model"])
+    if not model_installed(p["model"]) and info["engine"] != "chatterbox":
+        raise ValueError(f"A voz base '{info['label']}' ainda não está instalada. Instale pelo menu Voz base.")
+    chunks = narrate.split_text(text, info.get("max_chars", 250))
     if not chunks:
         raise ValueError("Escreva algum texto.")
     ref = resolve_ref(p["ref"])
@@ -222,7 +267,7 @@ def run_generate(job: dict) -> None:
     work.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
 
-    first = CB.loaded != p["model"]
+    first = W.loaded != p["model"]
     if first:
         msg = "Carregando o modelo de voz"
         if p["model"] == "ptbr" and not ptbr_ready():
@@ -234,10 +279,11 @@ def run_generate(job: dict) -> None:
     def on_progress(m):
         set_stage(job, "Gerando a fala…", m["done"], m["total"])
 
-    res = CB.call({"cmd": "generate", "model": p["model"], "lang": lang, "chunks": chunks, "ref_audio": str(ref),
-                   "outdir": str(work), "exaggeration": p["exaggeration"], "cfg_weight": p["cfg_weight"],
-                   "temperature": p["temperature"], "seed": seed}, on_progress)
-    CB.loaded = p["model"]
+    res = W.call({"cmd": "generate", "model": p["model"], "lang": lang, "chunks": chunks, "ref_audio": str(ref),
+                  "ref_text": ref_text_of(p["ref"]) if info["engine"] == "f5" else "",
+                  "outdir": str(work), "exaggeration": p["exaggeration"], "cfg_weight": p["cfg_weight"],
+                  "temperature": p["temperature"], "seed": seed}, on_progress)
+    W.loaded = p["model"]
     t_cb = time.time() - t_start
 
     set_stage(job, "Juntando as frases…")
@@ -248,6 +294,7 @@ def run_generate(job: dict) -> None:
     base = f"{stamp}_{slugify(p['text'])}"
     ext = p["format"]
     variants = []
+    base_name = tts_engines.ENGINE_LABELS[info["engine"]]
     t_rvc = 0.0
     if p["rvc"]:
         set_stage(job, "Aplicando o seu timbre (RVC)…")
@@ -263,16 +310,16 @@ def run_generate(job: dict) -> None:
         set_stage(job, "Finalizando…")
         f = OUT / f"{base}_rvc.{ext}"
         narrate.concat_and_finish([rvc_out], f, cfg_run, p["speed"])
-        variants.append({"label": "Chatterbox + RVC (seu timbre)" + (" · com graves/corpo" if has_eq else ""), "file": f.name, "rvc": True})
+        variants.append({"label": base_name + " + RVC (seu timbre)" + (" · com graves/corpo" if has_eq else ""), "file": f.name, "rvc": True})
         if has_eq and p["compare"]:
             f2 = OUT / f"{base}_rvc_flat.{ext}"
             narrate.concat_and_finish([rvc_out], f2, cfg_flat, p["speed"])
-            variants.append({"label": "Chatterbox + RVC · sem ajuste de graves", "file": f2.name, "rvc": True})
+            variants.append({"label": base_name + " + RVC · sem ajuste de graves", "file": f2.name, "rvc": True})
     if (not p["rvc"]) or p["compare"]:
         set_stage(job, "Finalizando…")
         f = OUT / f"{base}_cb.{ext}"
         narrate.concat_and_finish([raw], f, cfg_run, p["speed"])
-        variants.append({"label": "Só Chatterbox", "file": f.name, "rvc": False})
+        variants.append({"label": "Só " + base_name, "file": f.name, "rvc": False})
     for v in variants:
         try:
             v["duration"] = round(narrate.wav_duration(OUT / v["file"]), 2)
@@ -288,11 +335,12 @@ def run_generate(job: dict) -> None:
 
 def run_preload(job: dict) -> None:
     p = job["params"]
-    set_stage(job, "Carregando o Chatterbox…")
+    W = tts_worker(p["model"])
+    set_stage(job, "Carregando a voz base…")
     if p["model"] == "ptbr" and not ptbr_ready():
         set_stage(job, "Baixando o modelo pt-BR (só na primeira vez, ~3 GB)…")
-    CB.call({"cmd": "load", "model": p["model"]})
-    CB.loaded = p["model"]
+    W.call({"cmd": "load", "model": p["model"]})
+    W.loaded = p["model"]
     if p.get("rvc_model"):
         set_stage(job, "Carregando o RVC…")
         RV.call({"cmd": "load", "model": p["rvc_model"]})
@@ -398,8 +446,8 @@ def clone_loop() -> None:
 def clean_params(raw: dict, cfg: dict) -> dict:
     lang = raw.get("lang") if raw.get("lang") in ("pt", "en") else "pt"
     model = raw.get("model") if raw.get("model") in MODELS else "ptbr"
-    if lang != "pt":
-        model = "v3"
+    if lang not in MODELS[model]["langs"]:
+        model = tts_engines.models_for(lang)[0]
     fmt = raw.get("format") if raw.get("format") in ("wav", "mp3") else "wav"
     text = str(raw.get("text", "")).strip()
     if len(text) > 6000:
@@ -488,8 +536,12 @@ def build_state() -> dict:
     indices = sorted(f.name for f in idir.glob("*.index") if not av or f.name.startswith(av["name"] + "_")) if idir.exists() else []
     ref_default = Path(cb.get("ref_audio", "")).name
     return {
-        "workers": {"chatterbox": {"alive": CB.alive(), "loaded": CB.loaded}, "rvc": {"alive": RV.alive(), "loaded": RV.loaded}},
-        "models": [{"key": k, "label": v["label"], "lang": v["lang"], "ready": ptbr_ready() if k == "ptbr" else None} for k, v in MODELS.items()],
+        "workers": {"chatterbox": {"alive": CB.alive(), "loaded": CB.loaded}, **{k: {"alive": w.alive(), "loaded": w.loaded} for k, w in WORKERS.items() if k != "chatterbox"}, "rvc": {"alive": RV.alive(), "loaded": RV.loaded}},
+        "models": [{"key": k, "label": v["label"], "langs": v["langs"], "installed": model_installed(k),
+                    "ready": ptbr_ready() if k == "ptbr" else None, "engine": v["engine"], "license": v["license"],
+                    "commercial": v["commercial"], "pt_br": v["pt_br"], "tested": v["tested"], "note": v["note"], "size": v["size"]}
+                   for k, v in MODELS.items()],
+        "catalog": tts_engines.CATALOG, "accepted_licenses": portable.read_settings().get("accepted_licenses", []),
         "rvc_models": weights, "rvc_default": rv.get("model_name") or None, "indices": indices, "index_default": Path(rv.get("index_path", "")).name,
         "refs": list_refs(), "ref_default": "ds:" + ref_default if ref_default else None,
         "defaults": {"exaggeration": cb.get("exaggeration", 0.5), "cfg_weight": cb.get("cfg_weight", 0.5),
@@ -663,7 +715,7 @@ class Handler(BaseHTTPRequestHandler):
                         ctl["cancel"] = True
                         if ctl.get("proc"):
                             SM.kill_tree(ctl["proc"])
-                    CB.kill()
+                    [w.kill() for w in WORKERS.values()]
                     RV.kill()
                 return self._json({"ok": True})
             if u.path == "/api/presets/save":
@@ -677,6 +729,18 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/api/setup/start":
                 raw = json.loads(self._body() or b"{}")
                 SM.SETUP.start(str(raw.get("profile")), bool(raw.get("with_rvc")))
+                return self._json({"ok": True})
+            if u.path == "/api/engine/install":
+                raw = json.loads(self._body() or b"{}")
+                eid = str(raw.get("engine"))
+                if eid not in SM.ENGINE_STEPS:
+                    return self._err(400, "Voz base desconhecida.")
+                lic = [k for k, v in MODELS.items() if v["engine"] == eid and v["commercial"] != "sim"]
+                if lic and not raw.get("accept"):
+                    return self._err(400, "Aceite a licença para instalar.")
+                acc = set(portable.read_settings().get("accepted_licenses", []))
+                portable.write_settings(accepted_licenses=sorted(acc | ({eid} if lic else set())))
+                SM.SETUP.start_engine(eid)
                 return self._json({"ok": True})
             if u.path == "/api/setup/cancel":
                 SM.SETUP.cancel()
@@ -798,7 +862,7 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     finally:
-        CB.kill()
+        [w.kill() for w in WORKERS.values()]
         RV.kill()
     return 0
 

@@ -37,6 +37,9 @@ RVC_ZIP = f"https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebU
 CHATTERBOX_ZIP = f"https://github.com/resemble-ai/chatterbox/archive/{CHATTERBOX_COMMIT}.zip"
 PYPI = "https://pypi.org/simple"
 
+XTTS_PACKAGES = ["coqui-tts", "soundfile", "six"]
+F5_PACKAGES = ["f5-tts", "soundfile"]
+
 PROFILES = {
     "cuda": {
         "label": "GPU NVIDIA (CUDA 12.8)",
@@ -228,6 +231,16 @@ CHECKS = {
         "assets/pretrained_v2/f0D40k.pth", "logs/mute")),
     "venv_chatterbox": lambda: has_pkg(P.VENVS / "chatterbox", "torch", "chatterbox", "perth"),
     "chatterbox_models": lambda: all(p.exists() for p in chatterbox_files()),
+    "venv_xtts": lambda: has_pkg(P.VENVS / "xtts", "torch", "TTS", "six"),
+    "xtts_models": lambda: (P.ROOT / "models" / "xtts" / "downloaded.ok").exists(),
+    "venv_f5": lambda: has_pkg(P.VENVS / "f5", "torch", "f5_tts"),
+    "f5_models": lambda: all((P.ROOT / "models" / "f5_ptbr" / n).exists() for n in ("model_last.pt", "vocab.txt")),
+}
+
+# Optional base voices (menu "Voz base"), installed one at a time, on demand. Not part of STEPS.
+ENGINE_STEPS = {
+    "xtts": [("venv_xtts", "Ambiente do XTTS-v2 (PyTorch)", "~4 GB"), ("xtts_models", "Modelo XTTS-v2", "~2 GB")],
+    "f5": [("venv_f5", "Ambiente do F5-TTS (PyTorch)", "~4 GB"), ("f5_models", "Pesos pt-BR do F5-TTS", "~1,5 GB")],
 }
 
 STEPS = [  # id, label, rough download size, needs RVC
@@ -250,6 +263,7 @@ class Setup:
         self.states: dict[str, dict] = {}
         self.error: str | None = None
         self.running = False
+        self.engine_running: str | None = None
         self.profile: str | None = None
 
     # ---- public
@@ -267,7 +281,7 @@ class Setup:
         return {"running": self.running, "error": self.error, "steps": steps, "profile": s.get("profile"),
                 "with_rvc": with_rvc, "ready": all(x["state"] == "done" for x in required),
                 "profiles": {k: {"label": v["label"], "tested": v["tested"], "default_rvc": v["default_rvc"]} for k, v in PROFILES.items()},
-                "hardware": detect_hardware()}
+                "hardware": detect_hardware(), "engines": self.engines_status(), "engine_running": self.engine_running}
 
     def start(self, profile: str, with_rvc: bool) -> None:
         if profile not in PROFILES:
@@ -281,6 +295,83 @@ class Setup:
         P.write_settings(profile=profile, with_rvc=bool(with_rvc))
         self.thread = threading.Thread(target=self._run, args=(profile, bool(with_rvc)), daemon=True)
         self.thread.start()
+
+    def engines_status(self) -> dict:
+        out = {}
+        for eid, steps in ENGINE_STEPS.items():
+            rows = []
+            for sid, label, size in steps:
+                st = self.states.get(sid, {})
+                done = bool(st.get("state") == "done" or (st.get("state") != "running" and CHECKS[sid]()))
+                rows.append({"id": sid, "label": label, "size": size, "detail": st.get("detail", ""),
+                             "state": "running" if st.get("state") == "running" else "done" if done else st.get("state", "todo")})
+            out[eid] = {"installed": all(r["state"] == "done" for r in rows), "steps": rows}
+        return out
+
+    def engine_installed(self, eid: str) -> bool:
+        return all(CHECKS[sid]() for sid, _l, _s in ENGINE_STEPS[eid])
+
+    def start_engine(self, eid: str) -> None:
+        if eid not in ENGINE_STEPS:
+            raise ValueError("motor desconhecido")
+        s = P.read_settings()
+        profile = s.get("profile") or detect_hardware()["recommended"]
+        with self.lock:
+            if self.running:
+                raise ValueError("Já existe uma instalação em andamento. Espere ela terminar.")
+            self.running, self.error, self.profile = True, None, profile
+            self.engine_running = eid
+            self.ctl = {"cancel": False, "proc": None}
+            self.states = {}
+        self.thread = threading.Thread(target=self._run_engine, args=(eid, profile), daemon=True)
+        self.thread.start()
+
+    def _run_engine(self, eid: str, profile: str) -> None:
+        try:
+            if uv_cmd() is None or not P.has_ffmpeg():
+                self.states["tools"] = {"state": "running", "detail": ""}
+                self.step_tools(PROFILES[profile])
+                self.states["tools"] = {"state": "done", "detail": ""}
+            for sid, label, _size in ENGINE_STEPS[eid]:
+                if CHECKS[sid]():
+                    self.states[sid] = {"state": "done", "detail": ""}
+                    continue
+                self.states[sid] = {"state": "running", "detail": "iniciando…"}
+                getattr(self, "step_" + sid)(PROFILES[profile])
+                if not CHECKS[sid]():
+                    raise RuntimeError(f"O passo '{label}' terminou, mas faltam arquivos. Veja out/setup/{sid}.log")
+                self.states[sid] = {"state": "done", "detail": ""}
+        except Cancelled:
+            self.error = "Instalação cancelada. Ao continuar, o que já foi instalado é reaproveitado."
+            self._mark_failed("todo")
+        except Exception as e:  # noqa: BLE001
+            self.error = f"{type(e).__name__}: {e}"
+            self._mark_failed("error")
+        finally:
+            self.running = False
+            self.engine_running = None
+
+    def _torch_venv(self, sid: str, name: str, prof: dict) -> Path:
+        py = self._make_venv(sid, P.VENVS / name)
+        self._pip(sid, py, *prof["torch_chatterbox"], "--index-url", prof["torch_index"], "--extra-index-url", PYPI)
+        return py
+
+    def step_venv_xtts(self, prof: dict) -> None:
+        py = self._torch_venv("venv_xtts", "xtts", prof)
+        self._pip("venv_xtts", py, *XTTS_PACKAGES)
+
+    def step_xtts_models(self, prof: dict) -> None:
+        env = {**os.environ, "COQUI_TOS_AGREED": "1"}  # the studio only calls this after you accepted the CPML
+        self._sh("xtts_models", [str(P.venv_python(P.VENVS / "xtts")), "-W", "ignore",
+                                 str(P.ROOT / "engines" / "xtts_server.py"), str(P.ROOT), "--download"], env=env)
+
+    def step_venv_f5(self, prof: dict) -> None:
+        py = self._torch_venv("venv_f5", "f5", prof)
+        self._pip("venv_f5", py, *F5_PACKAGES)
+
+    def step_f5_models(self, prof: dict) -> None:
+        self._sh("f5_models", [str(P.venv_python(P.VENVS / "f5")), "-W", "ignore",
+                               str(P.ROOT / "engines" / "f5_server.py"), str(P.ROOT), "--download"])
 
     def cancel(self) -> None:
         self.ctl["cancel"] = True

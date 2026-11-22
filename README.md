@@ -44,6 +44,30 @@ python narrate.py --lang pt --text "Olá, pessoal!" --out vo.wav --json
 
 AMD, Intel e Apple não têm instalação automática.
 
+## Voz base (menu no Estúdio)
+
+No cartão **Voz** você escolhe qual motor fala o texto antes do RVC converter o timbre. Cada motor roda no seu próprio ambiente (`venvs/<motor>`) e o app instala com um botão. O cartão mostra licença, se permite uso comercial, suporte a pt-BR e se foi testado.
+
+| Voz base | Licença | Comercial | pt-BR | Testado aqui |
+|---|---|---|---|---|
+| Chatterbox pt-BR (padrão) | MIT | sim | sim, modelo dedicado | sim |
+| Chatterbox multilíngue v3 | MIT | sim | sim | sim |
+| XTTS-v2 | Coqui Public Model License | não | sim | instala e gera áudio, qualidade não avaliada |
+| F5-TTS pt-BR (comunidade) | CC-BY-NC 4.0 | não | sim, só pt-BR | instala e gera áudio, qualidade não avaliada |
+
+"Testado" para XTTS-v2 e F5-TTS quer dizer só isto: instalaram pelo app na RTX 5060 Ti, geraram uma frase em pt (cerca de 6 s, volume normal, sem trecho mudo) e nada mais. Se a voz soa bem ou parece com você, só o seu ouvido diz.
+
+As licenças não comerciais não impedem o uso pessoal, mas quem clonar o repo para monetizar deve ficar no Chatterbox. O app mostra o aviso antes de instalar.
+
+Outros que li e **não** integrei (licenças e READMEs oficiais; não é aconselhamento jurídico):
+
+| Motor | Situação |
+|---|---|
+| Fish Audio S2-Pro (4B) | Candidato: ~100 idiomas, cabe em 16 GB. Falta integrar (repositório e servidor próprios, Windows não validado). O Drama 3 (35B) não cabe. |
+| Higgs Audio v3 (4B) | Candidato: 100+ idiomas, licença só não comercial. Falta integrar (servidor SGLang-Omni, voltado a Linux). |
+| IndexTTS 2 / 2.5 | Não fala português (zh, en, ja, es, ar). |
+| CosyVoice 3 | Português não está na lista (zh, en, ja, ko, de, es, fr, it, ru). |
+
 ## Como o checkpoint é escolhido
 
 ![Checkpoints](docs/img/checkpoints.png)
@@ -76,7 +100,8 @@ Sua voz nunca vai para o git. `voices/`, `models/`, `settings.json`, `presets.js
 ```
 studio.py, ui/            o app (servidor local + interface)
 portable.py               caminhos e configuração, nada fixo
-setup_manager.py          detecção de hardware e instalação
+setup_manager.py          detecção de hardware e instalação (inclui as vozes base)
+tts_engines.py            lista das vozes base com licença e suporte a pt-BR
 voices.py                 vozes, clonagem e escolha de checkpoint
 narrate.py                texto -> arquivo de voz (use --json em pipelines)
 train_rvc.py              treino do RVC sem interface
@@ -109,5 +134,7 @@ Chatterbox (MIT), RVC (MIT), faster-whisper (MIT). GPT-SoVITS e F5-TTS são opci
 AMD, Intel and Apple GPUs are not supported by the automatic setup.
 
 **What the charts do and don't say:** the similarity score measures timbre only, not naturalness. On the author's voice the checkpoints score within about 0.86-0.88, and the one chosen by ear (epoch 100) scores slightly below epochs 30 and 60. The depth presets raise low-frequency energy, which was already above that of the real recordings, so they are a matter of taste, not a measured fix. The assistant that wrote this cannot listen to audio.
+
+**Base voice menu:** the Studio's *Voz* card picks the engine that speaks before RVC. Chatterbox pt-BR and multilingual v3 (MIT) are tested. XTTS-v2 (CPML) and F5-TTS pt-BR (CC-BY-NC) install with one click and are non-commercial; "tested" means only that they installed and produced a ~6 s clip on the author's RTX 5060 Ti, quality not judged. Fish S2-Pro and Higgs v3 are candidates not yet integrated; IndexTTS and CosyVoice have no Portuguese. Licence facts come from each project's own LICENSE and README; this is not legal advice.
 
 **Privacy:** voices, models, settings and presets are git-ignored; only code and text are in the repository.
