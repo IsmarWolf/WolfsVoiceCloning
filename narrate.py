@@ -136,7 +136,7 @@ def concat_and_finish(parts: list[Path], out: Path, cfg: dict, speed: float) -> 
                 if i:
                     fh.write(f"file '{silence.as_posix()}'\n")
                 fh.write(f"file '{q.as_posix()}'\n")
-        filters = []
+        filters = list(g.get("post_filter") or [])  # optional EQ / compression chosen in the studio
         if abs(speed - 1.0) > 1e-3:
             filters.append(f"atempo={max(0.5, min(2.0, speed))}")
         filters.append(f"loudnorm=I={lufs}:TP=-1.5:LRA=11")

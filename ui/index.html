@@ -182,7 +182,7 @@
       <div class="meta"><span id="count"></span><span id="est"></span></div>
       <div class="row">
         <button class="primary" id="go"><span id="goLabel">Gerar voz</span> <kbd>Ctrl+Enter</kbd></button>
-        <label class="switch" title="Gera duas versões para comparar de ouvido"><input type="checkbox" id="compare"> Comparar com e sem RVC</label>
+        <label class="switch" title="Gera duas versões para comparar de ouvido"><input type="checkbox" id="compare"> Comparar versões (sem RVC e sem ajustes)</label>
         <button class="ghost" id="cancel" hidden>Cancelar</button>
       </div>
       <div class="progress" id="progress" hidden>
@@ -235,6 +235,12 @@
           <select id="format"><option value="wav">WAV</option><option value="mp3">MP3</option></select>
         </label>
       </div>
+    </section>
+
+    <section class="card">
+      <div class="head"><h2>Profundidade</h2><div class="row" id="presets" style="gap:6px"></div></div>
+      <div class="hint" style="margin:-4px 0 8px">Se a voz sai suave demais, teste os botões acima, do mais leve ao mais forte: “Padrão”, “Corpo leve” e “Mais grave e firme”. Eles mexem no timbre (índice, proteção, tom), na interpretação e nestes ajustes de graves. Marque “Comparar versões” para ouvir com e sem o ajuste.</div>
+      <div id="eqSliders"></div>
     </section>
 
     <section class="card">
@@ -341,6 +347,17 @@ const RVC_SLIDERS = [
   { k: "protect", label: "Proteção de consoantes", min: 0, max: 0.5, step: 0.01, hint: "Evita chiado em “s”, “f” e “t”." },
   { k: "pitch", label: "Tom (semitons)", min: -12, max: 12, step: 1, hint: "0 = natural.", fmt: v => (v > 0 ? "+" : "") + v },
 ];
+const EQ_SLIDERS = [
+  { k: "bass", label: "Graves", min: 0, max: 10, step: 0.5, hint: "Dá peso e “chão” à voz. Comece com 3 a 5 dB.", fmt: v => (+v).toFixed(1) + " dB" },
+  { k: "body", label: "Corpo (peito)", min: -6, max: 8, step: 0.5, hint: "Região do peito, em torno de 250 Hz. Mais = voz mais cheia e grave; menos = mais fina.", fmt: v => (v > 0 ? "+" : "") + (+v).toFixed(1) + " dB" },
+  { k: "presence", label: "Presença", min: -6, max: 8, step: 0.5, hint: "Clareza e “mordida”, em torno de 3 kHz. Se ficar áspero, volte para perto de 0.", fmt: v => (v > 0 ? "+" : "") + (+v).toFixed(1) + " dB" },
+  { k: "punch", label: "Densidade (compressão)", min: 0, max: 1, step: 0.05, hint: "Nivela os volumes e deixa a voz mais firme e “de rádio”. 0 = desligado.", fmt: v => Math.round(v * 100) + "%" },
+];
+const PRESETS = {
+  flat: { label: "Padrão", hint: "Sem ajustes: o som original do seu modelo.", set: { exaggeration: 0.5, cfg_weight: 0.5, index_rate: 0.5, protect: 0.33, pitch: 0, bass: 0, body: 0, presence: 0, punch: 0 } },
+  light: { label: "Corpo leve", hint: "Um pouco mais de graves e de peito, sem mexer no tom.", set: { exaggeration: 0.55, cfg_weight: 0.45, index_rate: 0.65, protect: 0.28, pitch: 0, bass: 2.5, body: 1.5, presence: 0.5, punch: 0.25 } },
+  deep: { label: "Mais grave e firme", hint: "Timbre mais perto do seu, tom 1 semitom mais grave, graves, corpo e densidade.", set: { exaggeration: 0.6, cfg_weight: 0.4, index_rate: 0.75, protect: 0.2, pitch: -1, bass: 4, body: 2, presence: 1, punch: 0.4 } },
+};
 const EXAMPLES = {
   pt: { "Gancho": "Você sabia que noventa por cento das pessoas fazem isso do jeito errado? Fica comigo que eu te mostro em trinta segundos.",
         "Lista": "Três coisas que ninguém te conta sobre começar do zero. Primeiro, você não precisa estar pronto. Segundo, o primeiro vídeo vai ser ruim. Terceiro, quem aparece todo dia vence quem espera o momento perfeito.",
@@ -377,7 +394,8 @@ function defaults() {
   const d = S?.defaults || {};
   return { text: "", lang: "pt", model: "ptbr", ref: S?.ref_default || "", exaggeration: d.exaggeration ?? 0.5, cfg_weight: d.cfg_weight ?? 0.5,
            temperature: 0.8, pause_ms: d.pause_ms ?? 250, speed: d.speed ?? 1, seed: -1, format: "wav", rvc: true, compare: false,
-           rvc_model: S?.rvc_default || "", index: S?.index_default || "", index_rate: d.index_rate ?? 0.5, protect: d.protect ?? 0.33, pitch: 0 };
+           rvc_model: S?.rvc_default || "", index: S?.index_default || "", index_rate: d.index_rate ?? 0.5, protect: d.protect ?? 0.33, pitch: 0,
+           bass: 0, body: 0, presence: 0, punch: 0 };
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} }
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
@@ -404,7 +422,7 @@ function applyCfg() {
   if (!models.some(m => m.key === cfg.model)) { cfg.model = models[0].key; $("model").value = cfg.model; }
   $("ref").value = cfg.ref; if ($("ref").value !== cfg.ref) { cfg.ref = $("ref").value; }
   showRefText();
-  SLIDERS.concat(RVC_SLIDERS).forEach(s => s.sync && s.sync());
+  SLIDERS.concat(RVC_SLIDERS, EQ_SLIDERS).forEach(s => s.sync && s.sync());
   $("rvc").disabled = !S.rvc_models.length; $("rvc").title = S.rvc_models.length ? "" : "Esta voz não tem treino de timbre (RVC).";
   $("seed").value = cfg.seed; $("format").value = cfg.format; $("rvc").checked = cfg.rvc; $("compare").checked = cfg.compare;
   $("rvcModel").value = cfg.rvc_model; $("index").value = cfg.index;
@@ -542,7 +560,9 @@ $("history").onclick = async (e) => {
 };
 
 (async function init() {
-  buildSliders(SLIDERS, $("sliders")); buildSliders(RVC_SLIDERS, $("rvcSliders"));
+  buildSliders(SLIDERS, $("sliders")); buildSliders(RVC_SLIDERS, $("rvcSliders")); buildSliders(EQ_SLIDERS, $("eqSliders"));
+  $("presets").innerHTML = Object.entries(PRESETS).map(([k, p]) => `<button class="ghost small" data-pre="${k}" title="${p.hint}">${p.label}</button>`).join("");
+  $("presets").onclick = (e) => { const b = e.target.closest("[data-pre]"); if (!b) return; Object.assign(cfg, PRESETS[b.dataset.pre].set); applyCfg(); save(); toast(`“${PRESETS[b.dataset.pre].label}” aplicado. Gere de novo para ouvir.`); };
   try { S = await api.get("/api/state"); } catch (e) { $("history").innerHTML = `<div class="empty">Não consegui falar com o servidor local.</div>`; return; }
   cfg = { ...defaults(), ...load() };
   fixCfg();

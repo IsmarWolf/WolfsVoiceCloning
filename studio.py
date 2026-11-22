@@ -188,12 +188,29 @@ def ptbr_ready() -> bool:
     return (HERE / "models" / "chatterbox_ptbr" / "t3_pt_br.safetensors").exists()
 
 
+def eq_filters(p: dict) -> list[str]:
+    """ffmpeg filters for the 'profundidade' controls (all zero = no filtering)."""
+    f = []
+    if p["bass"] > 0:
+        f.append(f"bass=g={p['bass']:.1f}:f=120:w=0.7")           # low shelf: weight in the lows
+    if p["body"] != 0:
+        f.append(f"equalizer=f=250:t=q:w=0.9:g={p['body']:.1f}")  # chest / body of the voice
+    if p["presence"] != 0:
+        f.append(f"equalizer=f=3000:t=q:w=1:g={p['presence']:.1f}")  # clarity and bite
+    if p["punch"] > 0:
+        f.append(f"acompressor=threshold=0.125:ratio={1 + 3 * p['punch']:.2f}:attack=15:release=150:makeup={1 + 1.5 * p['punch']:.2f}")
+    return f
+
+
 def run_generate(job: dict) -> None:
     p = job["params"]
     cfg = load_cfg()
     gen = dict(cfg.get("general", {}))
     gen["pause_ms"] = p["pause_ms"]
     cfg_run = {"general": gen}
+    cfg_flat = {"general": dict(gen)}              # same, without the EQ: used for the A/B variant
+    gen["post_filter"] = eq_filters(p)
+    has_eq = bool(gen["post_filter"])
     lang = p["lang"]
     text = narrate.spell_numbers(p["text"], lang) if lang in ("pt", "en") else p["text"]
     chunks = narrate.split_text(text, 250)
@@ -225,7 +242,7 @@ def run_generate(job: dict) -> None:
 
     set_stage(job, "Juntando as frases…")
     raw = work / "raw.wav"
-    narrate.concat_and_finish([Path(f) for f in res["files"]], raw, cfg_run, 1.0)
+    narrate.concat_and_finish([Path(f) for f in res["files"]], raw, cfg_flat, 1.0)  # EQ only on the final files
 
     stamp = time.strftime("%Y%m%d-%H%M%S")
     base = f"{stamp}_{slugify(p['text'])}"
@@ -246,7 +263,11 @@ def run_generate(job: dict) -> None:
         set_stage(job, "Finalizando…")
         f = OUT / f"{base}_rvc.{ext}"
         narrate.concat_and_finish([rvc_out], f, cfg_run, p["speed"])
-        variants.append({"label": "Chatterbox + RVC (seu timbre)", "file": f.name, "rvc": True})
+        variants.append({"label": "Chatterbox + RVC (seu timbre)" + (" · com graves/corpo" if has_eq else ""), "file": f.name, "rvc": True})
+        if has_eq and p["compare"]:
+            f2 = OUT / f"{base}_rvc_flat.{ext}"
+            narrate.concat_and_finish([rvc_out], f2, cfg_flat, p["speed"])
+            variants.append({"label": "Chatterbox + RVC · sem ajuste de graves", "file": f2.name, "rvc": True})
     if (not p["rvc"]) or p["compare"]:
         set_stage(job, "Finalizando…")
         f = OUT / f"{base}_cb.{ext}"
@@ -355,6 +376,8 @@ def clean_params(raw: dict, cfg: dict) -> dict:
         "format": fmt, "rvc": bool(raw.get("rvc", True)) and bool(rvc_model), "compare": bool(raw.get("compare", False)),
         "rvc_model": rvc_model, "index": index, "index_rate": clamp(raw.get("index_rate"), 0.0, 1.0, 0.5),
         "protect": clamp(raw.get("protect"), 0.0, 0.5, 0.33), "pitch": int(clamp(raw.get("pitch"), -12, 12, 0)),
+        "bass": clamp(raw.get("bass"), 0.0, 10.0, 0.0), "body": clamp(raw.get("body"), -6.0, 8.0, 0.0),
+        "presence": clamp(raw.get("presence"), -6.0, 8.0, 0.0), "punch": clamp(raw.get("punch"), 0.0, 1.0, 0.0),
     }
 
 
