@@ -44,7 +44,7 @@ MODELS = {
     "index25": {
         "engine": "index", "label": "IndexTTS 2.5 (bilibili)", "langs": ["en"],
         "license": "bilibili Model Use License", "commercial": "sim",
-        "pt_br": "Não fala português (zh, en, ja, es, ar): só aparece para inglês", "tested": "não",
+        "pt_br": "Não fala português (zh, en, ja, es, ar): só funciona para inglês no estúdio", "tested": "não",
         "max_chars": 200, "size": "~12 GB",
         "note": "Instalador escrito a partir do README do projeto, NUNCA executado. Pede Python 3.11 e PyTorch 2.8; se falhar, o log fica em out/setup. Licença permite uso comercial abaixo de 100 milhões de usuários ativos ou RMB 1 bilhão de faturamento.",
     },

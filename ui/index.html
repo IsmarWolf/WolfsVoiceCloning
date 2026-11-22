@@ -228,7 +228,7 @@
         <select id="model"></select>
       </label>
       <div id="engineInfo" class="engine"></div>
-      <details class="more"><summary>Outros motores analisados (sem instalador automático)</summary><div id="catalog"></div></details>
+      <div id="catalog" hidden></div>
       <label class="f">Trecho de referência
         <div class="refline">
           <select id="ref"></select>
@@ -436,8 +436,11 @@ function applyCfg() {
   $("text").value = cfg.text || "";
   document.querySelectorAll("#lang button").forEach(b => b.classList.toggle("on", b.dataset.v === cfg.lang));
   const models = S.models.filter(m => m.langs.includes(cfg.lang));
-  fillSelect($("model"), models.map(m => ({ v: m.key, l: m.label + (!m.installed ? " · não instalada" : m.ready === false ? " · baixa na 1ª vez" : "") })), cfg.model);
-  if (!models.some(m => m.key === cfg.model)) { cfg.model = models[0].key; $("model").value = cfg.model; }
+  if (!models.some(m => m.key === cfg.model)) cfg.model = models[0].key;
+  // every engine is listed; the ones that cannot be used right now say why (selecting them only shows the info card)
+  const items = S.models.map(m => ({ v: m.key, l: m.label + (!m.langs.includes(cfg.lang) ? " · sem " + (cfg.lang === "pt" ? "português" : "inglês") : !m.installed ? " · não instalada" : m.ready === false ? " · baixa na 1ª vez" : "") }))
+    .concat((S.catalog || []).map((c, i) => ({ v: "cat:" + i, l: c.label + " · " + (c.status || "sem instalador") })));
+  fillSelect($("model"), items, cfg.model);
   renderEngine();
   $("ref").value = cfg.ref; if ($("ref").value !== cfg.ref) { cfg.ref = $("ref").value; }
   showRefText();
@@ -543,6 +546,7 @@ function trackJob(id, kind) {
 async function generate() {
   cfg.text = $("text").value.trim(); save();
   if (!cfg.text) { toast("Escreva algum texto.", true); return; }
+  if ($("model").value !== cfg.model) { toast("A voz base escolhida no menu não pode ser usada aqui. Escolha outra.", true); return; }
   const mm = S.models.find(x => x.key === cfg.model);
   if (mm && !mm.installed) { toast("Instale essa voz base primeiro (botão no cartão Voz).", true); return; }
   try { const r = await api.post("/api/generate", cfg); trackJob(r.id, "generate"); } catch (e) { toast(e.message, true); }
@@ -578,13 +582,28 @@ $("text").addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e
 $("go").onclick = generate;
 $("cancel").onclick = () => job && api.post("/api/cancel", { id: job.id });
 $("lang").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; cfg.lang = b.dataset.v; if (!S.models.find(m => m.key === cfg.model && m.langs.includes(cfg.lang))) cfg.model = cfg.lang === "pt" ? "ptbr" : "v3"; applyCfg(); save(); };
-$("model").onchange = () => { cfg.model = $("model").value; renderEngine(); save(); };
+$("model").onchange = () => {
+  const v = $("model").value, m = S.models.find(x => x.key === v);
+  if (m && m.langs.includes(cfg.lang)) cfg.model = v;
+  renderEngine(v); save();
+};
 
 // ---- "Voz base": licence, language and install status of each engine
 let ESU = null, engTimer = null;
 const COMM = { "sim": ["good", "uso comercial permitido"], "limitado": ["warn", "comercial com limites"], "não": ["warn", "uso não comercial"] };
-function renderEngine() {
-  const m = S.models.find(x => x.key === cfg.model); if (!m) return;
+function renderEngine(peek) {
+  peek = peek || $("model").value || cfg.model;
+  if (String(peek).startsWith("cat:")) {   // an engine the app cannot install: show why
+    const x = (S.catalog || [])[+peek.slice(4)]; if (!x) return;
+    const c = COMM[x.commercial] || ["warn", x.commercial];
+    $("engineInfo").innerHTML = `<div class="tags"><span class="tag ${c[0]}">${esc(c[1])}</span><span class="tag">${esc(x.license)}</span><span class="tag warn">${esc(x.status || "")}</span></div>
+      <div>Português do Brasil: ${esc(x.pt_br)}.</div><div style="opacity:.8">${esc(x.why)}</div>
+      <div class="row2" style="color:#ffb86b">Não dá para gerar com esta: o estúdio continua usando ${esc((S.models.find(z => z.key === cfg.model) || {}).label || "")}.</div>`;
+    $("sliders").style.opacity = 1; $("catalog").innerHTML = "";
+    return;
+  }
+  const m = S.models.find(x => x.key === peek); if (!m) return;
+  const wrongLang = !m.langs.includes(cfg.lang);
   const c = COMM[m.commercial] || ["warn", m.commercial];
   const st = ESU?.engines?.[m.engine];
   const busy = ESU?.engine_running === m.engine;
@@ -594,9 +613,9 @@ function renderEngine() {
     else act = `<div class="row2"><button class="primary" style="font-size:.85rem;padding:8px 16px" data-install="${esc(m.engine)}">Instalar (${esc(m.size)})</button>${ESU?.error ? `<span style="color:#ff7b7b">${esc(ESU.error)}</span>` : ""}</div>`;
   }
   $("engineInfo").innerHTML = `<div class="tags"><span class="tag ${c[0]}">${esc(c[1])}</span><span class="tag">${esc(m.license)}</span><span class="tag ${m.tested === "sim" ? "good" : "warn"}">${m.tested === "sim" ? "testado" : m.tested === "tecnico" ? "instala e gera áudio; qualidade não avaliada" : "não testado"}</span></div>
-    <div>Português do Brasil: ${esc(m.pt_br)}.</div><div style="opacity:.8">${esc(m.note)}</div>${act}`;
+    <div>Português do Brasil: ${esc(m.pt_br)}.</div><div style="opacity:.8">${esc(m.note)}</div>${wrongLang ? `<div class="row2" style="color:#ffb86b">Não fala ${cfg.lang === "pt" ? "português" : "inglês"}: o estúdio continua usando ${esc((S.models.find(z => z.key === cfg.model) || {}).label || "")}.</div>` : ""}${act}`;
   $("sliders").style.opacity = m.engine === "chatterbox" ? 1 : .45;
-  $("catalog").innerHTML = (S.catalog || []).map(x => `<div class="cat"><b>${esc(x.label)}</b> <span class="tag warn">${esc(x.status || "")}</span><div>Licença: ${esc(x.license)}</div><div>pt-BR: ${esc(x.pt_br)}</div><div style="opacity:.8">${esc(x.why)}</div></div>`).join("");
+  $("catalog").innerHTML = "";
 }
 $("engineInfo").onclick = async (e) => {
   const b = e.target.closest("button"); if (!b) return;
