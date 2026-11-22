@@ -6,6 +6,7 @@
 4. `train_rvc.py`: trains the RVC model headless (slice, pitch, features, train, index).
 5. `compare_checkpoints.py` + `test_sentences/`: renders the same test sentences from every saved checkpoint, so you pick the earliest good one and don't overtrain.
 6. `narrate.py` + `voice_config.toml` + `engines/`: text in, narration file out. Use `--json` for pipelines.
+7. `studio.py` + `ui/` (`studio.bat`): visual interface at http://127.0.0.1:7870 to type text, tune Chatterbox (pt-BR model) and RVC, compare with/without RVC, and keep a history. Models stay loaded between generations.
 
 Quick use once trained:
 ```

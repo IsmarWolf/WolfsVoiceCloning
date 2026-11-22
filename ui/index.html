@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wolf Voice Studio</title>
+<style>
+  :root {
+    --bg: #0a0c13; --bg2: #11141f; --card: rgba(255,255,255,.045); --line: rgba(255,255,255,.09);
+    --text: #e8ebf5; --muted: #8b93ad; --faint: #5b6382;
+    --a1: #8b5cf6; --a2: #22d3ee; --good: #34d399; --warn: #fbbf24; --bad: #f87171;
+    --grad: linear-gradient(135deg, var(--a1), var(--a2));
+    --shadow: 0 10px 40px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5fb; --bg2: #ffffff; --card: rgba(255,255,255,.85); --line: rgba(20,24,50,.12);
+      --text: #161a2e; --muted: #596082; --faint: #8b91ad; --shadow: 0 10px 30px rgba(40,50,100,.12);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.45;
+    background-image:
+      radial-gradient(900px 500px at 8% -10%, rgba(139,92,246,.20), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(34,211,238,.14), transparent 55%);
+    background-attachment: fixed;
+  }
+  header { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between;
+           padding: 18px clamp(16px, 4vw, 40px); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px);
+           position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 78%, transparent); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 42px; height: 42px; border-radius: 13px; background: var(--grad); display: grid; place-items: center;
+          box-shadow: 0 6px 22px rgba(139,92,246,.45); }
+  h1 { font-size: 1.15rem; margin: 0; letter-spacing: .2px; }
+  .brand p { margin: 0; color: var(--muted); font-size: .82rem; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; font-size: .78rem;
+          background: var(--card); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.on { background: var(--good); box-shadow: 0 0 10px var(--good); }
+  .dot.busy { background: var(--warn); box-shadow: 0 0 10px var(--warn); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 22px;
+         padding: 24px clamp(16px, 4vw, 40px) 60px; max-width: 1280px; margin: 0 auto; align-items: start; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .stack { display: grid; gap: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 12px; font-size: .78rem; text-transform: uppercase; letter-spacing: 1.3px; color: var(--muted); font-weight: 600; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .head h2 { margin: 0; }
+
+  textarea { width: 100%; min-height: 190px; resize: vertical; padding: 14px 16px; border-radius: 14px; font: inherit; font-size: 1.02rem;
+             color: var(--text); background: color-mix(in srgb, var(--bg2) 70%, transparent); border: 1px solid var(--line); outline: none; }
+  textarea:focus, select:focus, input[type=number]:focus { border-color: var(--a1); box-shadow: 0 0 0 3px rgba(139,92,246,.22); }
+  .meta { display: flex; justify-content: space-between; color: var(--faint); font-size: .8rem; margin: 6px 2px 14px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: .76rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+  .chip:hover { color: var(--text); border-color: var(--a1); }
+
+  button { font: inherit; cursor: pointer; }
+  .primary { border: 0; color: #fff; font-weight: 600; font-size: 1rem; padding: 12px 24px; border-radius: 14px; background: var(--grad);
+             box-shadow: 0 8px 26px rgba(139,92,246,.4); transition: transform .12s, filter .12s; display: inline-flex; align-items: center; gap: 10px; }
+  .primary:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
+  .primary:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+  kbd { font: inherit; font-size: .7rem; padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.2); }
+  .ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 8px 14px; border-radius: 12px; font-size: .85rem; }
+  .ghost:hover { color: var(--text); border-color: var(--a1); }
+  .ghost.small { padding: 5px 10px; font-size: .78rem; border-radius: 10px; }
+  .danger:hover { color: var(--bad); border-color: var(--bad); }
+
+  .switch { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; color: var(--muted); font-size: .88rem; }
+  .switch input { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--faint); position: relative; cursor: pointer; transition: .18s; flex: none; margin: 0; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .18s; }
+  .switch input:checked { background: var(--grad); }
+  .switch input:checked::after { left: 19px; }
+
+  .progress { margin-top: 16px; }
+  .bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; position: relative; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--grad); border-radius: 99px; transition: width .3s; }
+  .bar.indet i { width: 40%; position: absolute; animation: slide 1.2s infinite ease-in-out; }
+  @keyframes slide { 0% { left: -40%; } 100% { left: 100%; } }
+  .stage { display: flex; justify-content: space-between; margin-top: 8px; color: var(--muted); font-size: .85rem; }
+
+  label.f { display: block; margin: 14px 0 0; font-size: .85rem; color: var(--text); }
+  label.f:first-of-type { margin-top: 0; }
+  .lab { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .lab b { font-weight: 600; } .lab output { color: var(--a2); font-variant-numeric: tabular-nums; font-size: .82rem; }
+  .hint { color: var(--faint); font-size: .75rem; margin-top: 2px; }
+  select, input[type=number] { width: 100%; padding: 9px 11px; border-radius: 11px; font: inherit; font-size: .9rem; color: var(--text);
+                               background: color-mix(in srgb, var(--bg2) 75%, transparent); border: 1px solid var(--line); outline: none; }
+  select option { background: var(--bg2); color: var(--text); }
+  input[type=range] { width: 100%; accent-color: var(--a1); margin: 2px 0; }
+  .seg { display: inline-flex; background: color-mix(in srgb, var(--bg2) 75%, transparent); border: 1px solid var(--line); border-radius: 12px; padding: 3px; width: 100%; }
+  .seg button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 7px 10px; border-radius: 9px; font-size: .88rem; }
+  .seg button.on { background: var(--grad); color: #fff; font-weight: 600; }
+  .refline { display: flex; gap: 8px; } .refline select { flex: 1; min-width: 0; }
+  .reftext { color: var(--faint); font-size: .76rem; margin-top: 5px; font-style: italic; min-height: 1.2em; }
+  .divider { height: 1px; background: var(--line); margin: 16px 0 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .variant { padding: 12px 0; border-top: 1px solid var(--line); }
+  .variant:first-of-type { border-top: 0; padding-top: 0; }
+  .variant .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .tag { font-size: .72rem; padding: 3px 9px; border-radius: 99px; background: rgba(139,92,246,.18); color: #c4b5fd; border: 1px solid rgba(139,92,246,.35); }
+  .tag.cb { background: rgba(34,211,238,.12); color: #67e8f9; border-color: rgba(34,211,238,.3); }
+  audio { width: 100%; height: 40px; }
+  a.dl { color: var(--a2); font-size: .8rem; text-decoration: none; } a.dl:hover { text-decoration: underline; }
+  .timing { color: var(--faint); font-size: .78rem; margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .err { color: var(--bad); font-size: .9rem; margin-top: 12px; white-space: pre-wrap; }
+
+  .hist { padding: 14px 0; border-top: 1px solid var(--line); }
+  .hist:first-child { border-top: 0; padding-top: 0; }
+  .hist .t { font-size: .92rem; margin-bottom: 4px; }
+  .hist .s { color: var(--faint); font-size: .76rem; display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+  .hist .btns { display: flex; gap: 6px; margin-top: 8px; }
+  .empty { color: var(--faint); font-size: .88rem; padding: 6px 0; }
+
+  #toast { position: fixed; right: 18px; bottom: 18px; background: var(--bg2); color: var(--text); border: 1px solid var(--line); padding: 12px 16px; border-radius: 12px; box-shadow: var(--shadow); max-width: 360px; opacity: 0; transform: translateY(10px); transition: .25s; pointer-events: none; z-index: 10; }
+  #toast.show { opacity: 1; transform: none; } #toast.bad { border-color: var(--bad); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></svg>
+    </div>
+    <div><h1>Wolf Voice Studio</h1><p>sua voz, sob controle</p></div>
+  </div>
+  <div class="pills" id="pills"></div>
+</header>
+
+<main>
+  <div class="stack">
+    <section class="card">
+      <div class="head">
+        <h2>Texto</h2>
+        <div class="chips" id="examples"></div>
+      </div>
+      <textarea id="text" placeholder="Escreva ou cole o texto da narração…" spellcheck="true"></textarea>
+      <div class="meta"><span id="count"></span><span id="est"></span></div>
+      <div class="row">
+        <button class="primary" id="go"><span id="goLabel">Gerar voz</span> <kbd>Ctrl+Enter</kbd></button>
+        <label class="switch" title="Gera duas versões para comparar de ouvido"><input type="checkbox" id="compare"> Comparar com e sem RVC</label>
+        <button class="ghost" id="cancel" hidden>Cancelar</button>
+      </div>
+      <div class="progress" id="progress" hidden>
+        <div class="bar" id="bar"><i></i></div>
+        <div class="stage"><span id="stage"></span><span id="timer"></span></div>
+      </div>
+      <div class="err" id="error" hidden></div>
+    </section>
+
+    <section class="card" id="resultCard" hidden>
+      <div class="head"><h2>Resultado</h2><button class="ghost small" id="seedLock" hidden>Travar esta seed</button></div>
+      <div id="result"></div>
+      <div class="timing" id="timing"></div>
+    </section>
+
+    <section class="card">
+      <div class="head"><h2>Histórico</h2><span class="hint" id="histHint"></span></div>
+      <div id="history"></div>
+    </section>
+  </div>
+
+  <aside class="stack">
+    <section class="card">
+      <h2>Voz</h2>
+      <div class="seg" id="lang"><button data-v="pt" class="on">Português</button><button data-v="en">English</button></div>
+      <label class="f">Modelo do Chatterbox
+        <select id="model"></select>
+      </label>
+      <label class="f">Trecho de referência
+        <div class="refline">
+          <select id="ref"></select>
+          <button class="ghost small" id="refPlay" title="Ouvir a referência">▶</button>
+          <button class="ghost small" id="refUp" title="Usar outro áudio seu">＋</button>
+        </div>
+        <div class="reftext" id="refText"></div>
+        <input type="file" id="refFile" accept="audio/*" hidden>
+        <audio id="refAudio" hidden></audio>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Interpretação</h2>
+      <div id="sliders"></div>
+      <div class="grid2" style="margin-top:14px">
+        <label class="f" style="margin:0">Seed
+          <div class="refline"><input type="number" id="seed" min="-1" step="1" value="-1"><button class="ghost small" id="dice" title="Seed aleatória">🎲</button></div>
+          <div class="hint">-1 = nova a cada vez</div>
+        </label>
+        <label class="f" style="margin:0">Formato
+          <select id="format"><option value="wav">WAV</option><option value="mp3">MP3</option></select>
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="head"><h2>Seu timbre (RVC)</h2><label class="switch"><input type="checkbox" id="rvc" checked></label></div>
+      <div id="rvcBox">
+        <label class="f">Checkpoint
+          <select id="rvcModel"></select>
+          <div class="hint">Mais épocas = mais parecido, mas pode ficar áspero.</div>
+        </label>
+        <label class="f">Índice de retrieval
+          <select id="index"></select>
+        </label>
+        <div id="rvcSliders"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between">
+        <span class="hint" id="preHint">Os modelos carregam na primeira geração (~30 s).</span>
+        <button class="ghost small" id="preload">Pré-carregar</button>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="ghost small" id="reset">Restaurar ajustes</button></div>
+    </section>
+  </aside>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const api = {
+  get: (u) => fetch(u, { cache: "no-store" }).then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || r.statusText); return j; })),
+  post: (u, body, raw) => fetch(u, { method: "POST", headers: { "X-Studio": "1", ...(raw ? {} : { "Content-Type": "application/json" }) }, body: raw ? body : JSON.stringify(body || {}) })
+    .then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || r.statusText); return j; })),
+};
+const SLIDERS = [
+  { k: "exaggeration", label: "Expressividade", min: 0, max: 1.5, step: 0.05, hint: "Baixo = calmo e neutro. Alto = mais emoção e energia." },
+  { k: "cfg_weight", label: "Ritmo", min: 0, max: 1, step: 0.05, hint: "Baixo = fala mais devagar e pausada. Alto = segue mais a referência." },
+  { k: "temperature", label: "Variação", min: 0.2, max: 1.5, step: 0.05, hint: "Baixo = mais estável. Alto = mais natural, mas arrisca erros." },
+  { k: "pause_ms", label: "Pausa entre frases", min: 0, max: 1000, step: 25, hint: "Em milissegundos.", fmt: v => v + " ms" },
+  { k: "speed", label: "Velocidade", min: 0.8, max: 1.3, step: 0.01, hint: "Muda o tempo sem mexer no tom.", fmt: v => (+v).toFixed(2) + "×" },
+];
+const RVC_SLIDERS = [
+  { k: "index_rate", label: "Força do índice", min: 0, max: 1, step: 0.05, hint: "Mais alto = mais perto do seu timbre, mas pode chiar." },
+  { k: "protect", label: "Proteção de consoantes", min: 0, max: 0.5, step: 0.01, hint: "Evita chiado em “s”, “f” e “t”." },
+  { k: "pitch", label: "Tom (semitons)", min: -12, max: 12, step: 1, hint: "0 = natural.", fmt: v => (v > 0 ? "+" : "") + v },
+];
+const EXAMPLES = {
+  pt: { "Gancho": "Você sabia que noventa por cento das pessoas fazem isso do jeito errado? Fica comigo que eu te mostro em trinta segundos.",
+        "Lista": "Três coisas que ninguém te conta sobre começar do zero. Primeiro, você não precisa estar pronto. Segundo, o primeiro vídeo vai ser ruim. Terceiro, quem aparece todo dia vence quem espera o momento perfeito.",
+        "Chamada": "Se esse vídeo te ajudou, salva pra ver depois e me segue pra mais dicas como essa." },
+  en: { "Hook": "Did you know that ninety percent of people do this the wrong way? Stay with me and I'll show you in thirty seconds.",
+        "List": "Three things nobody tells you about starting from scratch. First, you don't need to be ready. Second, your first video will be bad. Third, showing up every day beats waiting for the perfect moment.",
+        "Call to action": "If this video helped you, save it for later and follow for more tips like this." },
+};
+let S = null;           // server state
+let cfg = {};           // current settings
+let job = null;         // running job
+let timerId = null, pollId = null;
+const KEY = "wvs.settings.v1";
+
+function toast(msg, bad) { const t = $("toast"); t.textContent = msg; t.className = "show" + (bad ? " bad" : ""); clearTimeout(toast.id); toast.id = setTimeout(() => t.className = "", 3800); }
+const fmtDur = (s) => s == null ? "–" : (s < 60 ? s.toFixed(1) + " s" : Math.floor(s / 60) + " min " + Math.round(s % 60) + " s");
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function buildSliders(list, host) {
+  host.innerHTML = "";
+  for (const s of list) {
+    const el = document.createElement("label"); el.className = "f";
+    el.innerHTML = `<div class="lab"><b>${s.label}</b><output id="o_${s.k}"></output></div>
+      <input type="range" id="s_${s.k}" min="${s.min}" max="${s.max}" step="${s.step}"><div class="hint">${s.hint}</div>`;
+    host.appendChild(el);
+    const inp = el.querySelector("input"), out = el.querySelector("output");
+    const show = () => out.textContent = s.fmt ? s.fmt(inp.value) : (+inp.value).toFixed(2);
+    inp.addEventListener("input", () => { cfg[s.k] = +inp.value; show(); save(); });
+    inp.addEventListener("dblclick", () => { cfg[s.k] = defaults()[s.k]; applyCfg(); save(); });
+    s.sync = () => { inp.value = cfg[s.k]; show(); };
+  }
+}
+function defaults() {
+  const d = S?.defaults || {};
+  return { text: "", lang: "pt", model: "ptbr", ref: S?.ref_default || "", exaggeration: d.exaggeration ?? 0.5, cfg_weight: d.cfg_weight ?? 0.5,
+           temperature: 0.8, pause_ms: d.pause_ms ?? 250, speed: d.speed ?? 1, seed: -1, format: "wav", rvc: true, compare: false,
+           rvc_model: S?.rvc_default || "", index: S?.index_default || "", index_rate: d.index_rate ?? 0.5, protect: d.protect ?? 0.33, pitch: 0 };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} }
+function load() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
+
+function fillSelect(sel, items, value, labelFn) {
+  sel.innerHTML = items.map(i => `<option value="${esc(i.v)}">${esc(i.l)}</option>`).join("");
+  if (items.some(i => i.v === value)) sel.value = value;
+}
+function applyCfg() {
+  $("text").value = cfg.text || "";
+  document.querySelectorAll("#lang button").forEach(b => b.classList.toggle("on", b.dataset.v === cfg.lang));
+  const models = S.models.filter(m => cfg.lang === "pt" ? true : m.key === "v3");
+  fillSelect($("model"), models.map(m => ({ v: m.key, l: m.label + (m.ready === false ? " · baixa na 1ª vez" : "") })), cfg.model);
+  if (!models.some(m => m.key === cfg.model)) { cfg.model = models[0].key; $("model").value = cfg.model; }
+  $("ref").value = cfg.ref; if ($("ref").value !== cfg.ref) { cfg.ref = $("ref").value; }
+  showRefText();
+  SLIDERS.concat(RVC_SLIDERS).forEach(s => s.sync && s.sync());
+  $("seed").value = cfg.seed; $("format").value = cfg.format; $("rvc").checked = cfg.rvc; $("compare").checked = cfg.compare;
+  $("rvcModel").value = cfg.rvc_model; $("index").value = cfg.index;
+  $("rvcBox").style.opacity = cfg.rvc ? 1 : .4; $("rvcBox").style.pointerEvents = cfg.rvc ? "" : "none";
+  $("compare").closest("label").style.display = cfg.rvc ? "" : "none";
+  updateCount();
+  renderExamples();
+}
+function showRefText() { const r = S.refs.find(x => x.id === cfg.ref); $("refText").textContent = r ? `${r.dur.toFixed(1)} s · “${r.text.slice(0, 90)}${r.text.length > 90 ? "…" : ""}”` : ""; }
+function updateCount() {
+  const t = $("text").value.trim(); const words = t ? t.split(/\s+/).length : 0;
+  $("count").textContent = `${t.length} caracteres · ${words} palavras`;
+  $("est").textContent = t ? `≈ ${fmtDur(t.length / 15 / cfg.speed)} de áudio` : "";
+}
+function renderExamples() {
+  const box = $("examples"); box.innerHTML = "";
+  for (const [name, txt] of Object.entries(EXAMPLES[cfg.lang])) {
+    const b = document.createElement("button"); b.className = "chip"; b.textContent = name;
+    b.onclick = () => { $("text").value = txt; cfg.text = txt; updateCount(); save(); };
+    box.appendChild(b);
+  }
+}
+function renderSelects() {
+  const refs = S.refs.slice().sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "upload" ? -1 : 1));
+  fillSelect($("ref"), refs.map(r => ({ v: r.id, l: `${r.kind === "upload" ? "★ " : ""}${r.label} · ${r.dur.toFixed(1)} s` })), cfg.ref);
+  fillSelect($("rvcModel"), S.rvc_models.map(n => ({ v: n, l: n.replace(/^(.*?)_e(\d+)_s(\d+)\.pth$/, "$1 · época $2 (passo $3)") })), cfg.rvc_model);
+  fillSelect($("index"), [{ v: "", l: "Sem índice" }].concat(S.indices.map(n => ({ v: n, l: n }))), cfg.index);
+}
+
+function updatePills() {
+  const w = S.workers, g = S.gpu, busy = job && ["queued", "running"].includes(job.status);
+  const m = (k) => ({ ptbr: "pt-BR", v3: "multilíngue v3" }[k] || k);
+  const pills = [
+    [w.chatterbox.loaded ? "on" : (busy ? "busy" : ""), w.chatterbox.loaded ? `Chatterbox · ${m(w.chatterbox.loaded)}` : "Chatterbox · descarregado"],
+    [w.rvc.loaded ? "on" : (busy ? "busy" : ""), w.rvc.loaded ? `RVC · época ${(w.rvc.loaded.match(/_e(\d+)/) || [])[1] || "?"}` : "RVC · descarregado"],
+  ];
+  if (g) pills.push(["on", `${g.name} · ${g.used_gb}/${g.total_gb} GB`]);
+  $("pills").innerHTML = pills.map(p => `<span class="pill"><i class="dot ${p[0]}"></i>${esc(p[1])}</span>`).join("");
+  $("preHint").textContent = w.chatterbox.loaded && (!cfg.rvc || w.rvc.loaded) ? "Modelos carregados: a geração é rápida." : "Os modelos carregam na primeira geração (~30 s).";
+}
+
+function variantHTML(v, name) {
+  const dl = `/file/out/${encodeURIComponent(v.file)}?dl=1`;
+  return `<div class="variant"><div class="top"><span class="tag ${v.rvc ? "" : "cb"}">${esc(v.label)}</span>
+    <span><span class="hint">${fmtDur(v.duration)}</span> · <a class="dl" href="${dl}" download>baixar</a></span></div>
+    <audio controls preload="metadata" src="/file/out/${encodeURIComponent(v.file)}"></audio></div>`;
+}
+function showResult(m) {
+  $("resultCard").hidden = false;
+  $("result").innerHTML = m.variants.map(v => variantHTML(v, m.name)).join("");
+  $("timing").innerHTML = `<span>voz ${m.seconds_voice} s</span>${m.seconds_rvc ? `<span>RVC ${m.seconds_rvc} s</span>` : ""}<span>total ${m.seconds} s</span><span>seed ${m.params.seed}</span>`;
+  $("seedLock").hidden = false; $("seedLock").dataset.seed = m.params.seed;
+  const first = $("result").querySelector("audio"); if (first) { first.play().catch(() => {}); }
+}
+function renderHistory() {
+  const h = S.history; $("histHint").textContent = h.length ? `${h.length} recentes` : "";
+  if (!h.length) { $("history").innerHTML = `<div class="empty">Nada gerado ainda. Escreva um texto e clique em “Gerar voz”.</div>`; return; }
+  $("history").innerHTML = h.map(m => {
+    const p = m.params, when = new Date(m.created * 1000).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const ep = p.rvc ? ((p.rvc_model.match(/_e(\d+)/) || [])[1] || "") : "";
+    return `<div class="hist" data-name="${esc(m.name)}"><div class="t">${esc(m.text.length > 120 ? m.text.slice(0, 120) + "…" : m.text)}</div>
+      <div class="s"><span>${when}</span><span>${p.lang === "pt" ? "pt-BR" : "en"}</span><span>${p.rvc ? "RVC e" + ep : "sem RVC"}</span><span>expr ${(+p.exaggeration).toFixed(2)}</span><span>seed ${p.seed}</span></div>
+      ${m.variants.map(v => variantHTML(v, m.name)).join("")}
+      <div class="btns"><button class="ghost small" data-act="reuse">Reusar ajustes</button><button class="ghost small danger" data-act="del">Apagar</button></div></div>`;
+  }).join("");
+}
+
+async function refreshState(full) {
+  try {
+    const prev = S; S = await api.get("/api/state");
+    if (full || !prev) { renderSelects(); applyCfg(); }
+    updatePills();
+    return true;
+  } catch (e) { return false; }
+}
+
+function setBusy(on) {
+  $("go").disabled = on; $("cancel").hidden = !on; $("preload").disabled = on;
+  $("goLabel").textContent = on ? "Gerando…" : "Gerar voz";
+  $("progress").hidden = !on && !(job && job.status === "error");
+}
+function trackJob(id, kind) {
+  const t0 = performance.now(); $("error").hidden = true; $("progress").hidden = false;
+  job = { id, status: "queued", kind }; setBusy(true);
+  clearInterval(timerId); timerId = setInterval(() => $("timer").textContent = ((performance.now() - t0) / 1000).toFixed(0) + " s", 500);
+  clearInterval(pollId);
+  pollId = setInterval(async () => {
+    let j; try { j = await api.get("/api/job?id=" + id); } catch (e) { return; }
+    job = j;
+    const bar = $("bar"), pr = j.progress;
+    $("stage").textContent = (j.status === "queued" ? "Na fila" + (j.queue_position > 1 ? ` (${j.queue_position}º)` : "") + "…" : j.stage || "");
+    if (pr && pr[1]) { bar.classList.remove("indet"); bar.firstElementChild.style.width = Math.round(100 * pr[0] / pr[1]) + "%"; $("stage").textContent += ` ${pr[0]}/${pr[1]}`; }
+    else { bar.classList.add("indet"); bar.firstElementChild.style.width = ""; }
+    if (["done", "error", "cancelled"].includes(j.status)) {
+      clearInterval(pollId); clearInterval(timerId); setBusy(false);
+      if (j.status === "done") {
+        $("progress").hidden = true;
+        if (kind === "generate") { await refreshState(false); renderHistory(); showResult(j.result); } else { await refreshState(false); toast("Modelos carregados."); }
+      } else if (j.status === "error") { $("error").textContent = j.error; $("error").hidden = false; await refreshState(false); }
+      else { $("progress").hidden = true; toast("Cancelado."); }
+      updatePills();
+    }
+  }, 600);
+}
+async function generate() {
+  cfg.text = $("text").value.trim(); save();
+  if (!cfg.text) { toast("Escreva algum texto.", true); return; }
+  try { const r = await api.post("/api/generate", cfg); trackJob(r.id, "generate"); } catch (e) { toast(e.message, true); }
+}
+
+// ---- wiring
+$("text").addEventListener("input", () => { cfg.text = $("text").value; updateCount(); save(); });
+$("text").addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); generate(); } });
+$("go").onclick = generate;
+$("cancel").onclick = () => job && api.post("/api/cancel", { id: job.id });
+$("lang").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; cfg.lang = b.dataset.v; cfg.model = cfg.lang === "pt" ? "ptbr" : "v3"; applyCfg(); save(); };
+$("model").onchange = () => { cfg.model = $("model").value; save(); };
+$("ref").onchange = () => { cfg.ref = $("ref").value; showRefText(); save(); $("refAudio").pause(); };
+$("refPlay").onclick = () => { const a = $("refAudio"); if (!a.paused) { a.pause(); return; } a.src = "/file/ref/" + encodeURIComponent(cfg.ref); a.play().catch(() => {}); };
+$("refUp").onclick = () => $("refFile").click();
+$("refFile").onchange = async () => {
+  const f = $("refFile").files[0]; if (!f) return;
+  try { const r = await api.post("/api/upload_ref?name=" + encodeURIComponent(f.name), f, true); cfg.ref = r.id; await refreshState(true); toast("Referência adicionada."); }
+  catch (e) { toast(e.message, true); } finally { $("refFile").value = ""; }
+};
+$("seed").onchange = () => { cfg.seed = parseInt($("seed").value || "-1", 10); save(); };
+$("dice").onclick = () => { cfg.seed = Math.floor(Math.random() * 1e9); $("seed").value = cfg.seed; save(); };
+$("seedLock").onclick = () => { cfg.seed = +$("seedLock").dataset.seed; $("seed").value = cfg.seed; save(); toast("Seed travada: " + cfg.seed); };
+$("format").onchange = () => { cfg.format = $("format").value; save(); };
+$("rvc").onchange = () => { cfg.rvc = $("rvc").checked; applyCfg(); save(); };
+$("compare").onchange = () => { cfg.compare = $("compare").checked; save(); };
+$("rvcModel").onchange = () => { cfg.rvc_model = $("rvcModel").value; save(); };
+$("index").onchange = () => { cfg.index = $("index").value; save(); };
+$("preload").onclick = async () => { try { const r = await api.post("/api/preload", cfg); trackJob(r.id, "preload"); } catch (e) { toast(e.message, true); } };
+$("reset").onclick = () => { const t = cfg.text; cfg = { ...defaults(), text: t }; applyCfg(); save(); toast("Ajustes restaurados."); };
+$("history").onclick = async (e) => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const name = b.closest(".hist").dataset.name, m = S.history.find(x => x.name === name);
+  if (b.dataset.act === "del") { await api.post("/api/delete", { name }); await refreshState(false); renderHistory(); }
+  if (b.dataset.act === "reuse" && m) { cfg = { ...defaults(), ...m.params, text: m.text }; applyCfg(); save(); window.scrollTo({ top: 0, behavior: "smooth" }); toast("Ajustes carregados."); }
+};
+
+(async function init() {
+  buildSliders(SLIDERS, $("sliders")); buildSliders(RVC_SLIDERS, $("rvcSliders"));
+  try { S = await api.get("/api/state"); } catch (e) { $("history").innerHTML = `<div class="empty">Não consegui falar com o servidor local.</div>`; return; }
+  cfg = { ...defaults(), ...load() };
+  if (!S.refs.some(r => r.id === cfg.ref)) cfg.ref = S.ref_default || (S.refs[0] && S.refs[0].id) || "";
+  if (!S.rvc_models.includes(cfg.rvc_model)) cfg.rvc_model = S.rvc_default || S.rvc_models[S.rvc_models.length - 1] || "";
+  if (!S.indices.includes(cfg.index) && cfg.index) cfg.index = S.index_default || "";
+  renderSelects(); applyCfg(); renderHistory(); updatePills();
+  setInterval(() => { if (!document.hidden) refreshState(false); }, 5000);
+})();
+</script>
+</body>
+</html>
