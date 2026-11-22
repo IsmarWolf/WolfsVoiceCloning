@@ -26,3 +26,4 @@ __pycache__/
 
 *.err
 .model-downloads/
+models/
