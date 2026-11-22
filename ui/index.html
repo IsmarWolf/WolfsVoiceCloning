@@ -206,6 +206,13 @@
 
   <aside class="stack">
     <section class="card">
+      <div class="head"><h2>Minhas configurações</h2><span class="hint" id="pcount"></span></div>
+      <div class="refline"><select id="pSel"></select><button class="ghost small danger" id="pDel" title="Apagar a selecionada">Apagar</button></div>
+      <div class="refline" style="margin-top:8px"><input type="text" id="pName" maxlength="40" placeholder="Nome para salvar os ajustes atuais"><button class="ghost small" id="pSave">Salvar</button></div>
+      <div class="hint" style="margin-top:6px">Guarda todos os controles (voz, interpretação, timbre e profundidade; o texto não). Ficam só neste computador. O app também lembra os últimos ajustes ao reabrir.</div>
+    </section>
+
+    <section class="card">
       <h2>Voz</h2>
       <div class="seg" id="lang"><button data-v="pt" class="on">Português</button><button data-v="en">English</button></div>
       <label class="f">Modelo do Chatterbox
@@ -527,6 +534,30 @@ async function generate() {
   try { const r = await api.post("/api/generate", cfg); trackJob(r.id, "generate"); } catch (e) { toast(e.message, true); }
 }
 
+// ---- saved settings (stored by the server in presets.json)
+let PS = [];
+async function loadPresets() {
+  try { PS = (await api.get("/api/presets")).presets; } catch (e) { PS = []; }
+  const keep = $("pSel").value;
+  $("pSel").innerHTML = `<option value="">— escolher e aplicar —</option>` + PS.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("");
+  if (PS.some(p => p.name === keep)) $("pSel").value = keep;
+  $("pcount").textContent = PS.length ? PS.length + " salva(s)" : "";
+}
+$("pSel").onchange = () => {
+  const p = PS.find(x => x.name === $("pSel").value); if (!p) return;
+  const t = cfg.text; cfg = { ...cfg, ...p.values, text: t }; fixCfg(); applyCfg(); save(); $("pName").value = p.name; toast(`“${p.name}” aplicada.`);
+};
+$("pSave").onclick = async () => {
+  const name = $("pName").value.trim(); if (!name) { toast("Dê um nome para salvar.", true); return; }
+  const { text, ...values } = cfg; delete values.voice;
+  try { await api.post("/api/presets/save", { name, values }); await loadPresets(); $("pSel").value = name; toast(`“${name}” salva.`); } catch (e) { toast(e.message, true); }
+};
+$("pDel").onclick = async () => {
+  const name = $("pSel").value; if (!name) { toast("Escolha uma configuração para apagar.", true); return; }
+  if (!confirm(`Apagar a configuração “${name}”?`)) return;
+  await api.post("/api/presets/delete", { name }); $("pName").value = ""; await loadPresets(); toast("Apagada.");
+};
+
 // ---- wiring
 $("text").addEventListener("input", () => { cfg.text = $("text").value; updateCount(); save(); });
 $("text").addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); generate(); } });
@@ -566,7 +597,7 @@ $("history").onclick = async (e) => {
   try { S = await api.get("/api/state"); } catch (e) { $("history").innerHTML = `<div class="empty">Não consegui falar com o servidor local.</div>`; return; }
   cfg = { ...defaults(), ...load() };
   fixCfg();
-  renderSelects(); applyCfg(); renderHistory(); updatePills();
+  renderSelects(); applyCfg(); renderHistory(); updatePills(); loadPresets();
   setInterval(() => { if (!document.hidden) refreshState(false); }, 5000);
 })();
 </script>

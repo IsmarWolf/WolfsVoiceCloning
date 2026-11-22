@@ -320,6 +320,49 @@ def worker_loop() -> None:
         job["finished"] = time.time()
 
 
+# --------------------------------------------------------------------------- saved settings
+PRESETS_PATH = HERE / "presets.json"      # git-ignored: personal
+PRESET_KEYS = {"lang": str, "model": str, "ref": str, "exaggeration": float, "cfg_weight": float, "temperature": float,
+               "pause_ms": float, "speed": float, "seed": float, "format": str, "rvc": bool, "compare": bool,
+               "rvc_model": str, "index": str, "index_rate": float, "protect": float, "pitch": float,
+               "bass": float, "body": float, "presence": float, "punch": float}
+
+
+def read_presets() -> dict:
+    try:
+        return json.loads(PRESETS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_preset(name: str, values: dict) -> None:
+    name = name.strip()
+    if not name or len(name) > 40:
+        raise ValueError("Dê um nome de até 40 caracteres.")
+    clean = {}
+    for k, t in PRESET_KEYS.items():
+        v = values.get(k)
+        if v is None:
+            continue
+        if t is bool:
+            clean[k] = bool(v)
+        elif t is float:
+            clean[k] = clamp(v, -1e9, 1e9, 0)
+        else:
+            clean[k] = str(v)[:200]
+    allp = read_presets()
+    if len(allp) >= 100 and name not in allp:
+        raise ValueError("Limite de 100 configurações salvas.")
+    allp[name] = {"values": clean, "saved": time.time()}
+    PRESETS_PATH.write_text(json.dumps(allp, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def delete_preset(name: str) -> None:
+    allp = read_presets()
+    if allp.pop(name, None) is not None:
+        PRESETS_PATH.write_text(json.dumps(allp, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 # --------------------------------------------------------------------------- cloning jobs (long, own thread)
 CLONE_Q: "queue.Queue[str]" = queue.Queue()
 
@@ -550,6 +593,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._file(HERE / "ui" / "index.html")
             if path == "/api/state":
                 return self._json(build_state())
+            if path == "/api/presets":
+                return self._json({"presets": [{"name": k, "values": v["values"], "saved": v.get("saved")}
+                                               for k, v in sorted(read_presets().items(), key=lambda kv: kv[0].lower())]})
             if path == "/api/setup":
                 return self._json(SM.SETUP.status())
             if path == "/api/voices":
@@ -619,6 +665,14 @@ class Handler(BaseHTTPRequestHandler):
                             SM.kill_tree(ctl["proc"])
                     CB.kill()
                     RV.kill()
+                return self._json({"ok": True})
+            if u.path == "/api/presets/save":
+                raw = json.loads(self._body() or b"{}")
+                save_preset(str(raw.get("name", "")), raw.get("values") or {})
+                return self._json({"ok": True})
+            if u.path == "/api/presets/delete":
+                raw = json.loads(self._body() or b"{}")
+                delete_preset(str(raw.get("name", "")))
                 return self._json({"ok": True})
             if u.path == "/api/setup/start":
                 raw = json.loads(self._body() or b"{}")
