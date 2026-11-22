@@ -129,19 +129,23 @@ Use absolute paths for `--input` and `--output`: the CLI changes into the RVC fo
 
 ## 3. Chatterbox Multilingual: Portuguese speech (MIT)
 
+No training is needed. It clones the voice from one reference clip, and RVC adds your exact timbre on top.
+Tuning knobs in `voice_config.toml`: `exaggeration` (energy) and `cfg_weight` (pacing).
+
+This is the install that worked on the RTX 5060 Ti (about 4 GB plus ~3 GB of model weights on first run):
 ```powershell
 cd C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning
-py -3.11 -m venv venvs\chatterbox
-venvs\chatterbox\Scripts\pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
-venvs\chatterbox\Scripts\pip install chatterbox-tts --no-deps
-venvs\chatterbox\Scripts\pip install "transformers==5.2.0" "diffusers==0.29.0" "librosa==0.11.0" soundfile safetensors conformer s3tokenizer "resemble-perth @ git+https://github.com/resemble-ai/Perth.git@master" pykakasi spacy-pkuseg
+py -3.12 -m venv venvs\chatterbox
+venvs\chatterbox\Scripts\python -m pip install torch==2.7.1+cu128 torchaudio==2.7.1+cu128 --index-url https://download.pytorch.org/whl/cu128 --extra-index-url https://pypi.org/simple
+# chatterbox pins torch 2.6.0, which has no RTX 50-series kernels, so install it without its dependencies...
+venvs\chatterbox\Scripts\python -m pip install --no-deps git+https://github.com/resemble-ai/chatterbox.git
+# ...and add the rest by hand
+venvs\chatterbox\Scripts\python -m pip install "numpy<2" librosa==0.11.0 s3tokenizer transformers==5.2.0 diffusers==0.29.0 resemble-perth conformer==0.3.2 safetensors==0.5.3 spacy-pkuseg pykakasi==2.3.0 pyloudnorm omegaconf soundfile "setuptools<81"
 ```
-Why `--no-deps`: Chatterbox pins `torch==2.6.0`, which doesn't run on RTX 50-series. We keep the cu128 torch and install the rest by hand.
-If an import error names a missing package, `pip install` it. The full list is in Chatterbox's `pyproject.toml`.
-
-No training is needed. It clones from the reference clip, and RVC adds your exact timbre on top.
-Tuning knobs in `voice_config.toml`: `exaggeration` (energy) and `cfg_weight` (pacing).
-Resemble also published a Brazilian-Portuguese fine-tune (`ResembleAI/Chatterbox-Multilingual-pt-br`) that we can try if the accent from the multilingual model sounds off.
+- Use the GitHub version, not PyPI's `chatterbox-tts` 0.1.7: only the GitHub one has the newer `t3_model="v3"` multilingual model.
+- `setuptools<81` matters: without it, `resemble-perth` fails to load its watermarker (`'NoneType' object is not callable`).
+- pip will warn that chatterbox wants torch 2.6.0 and gradio. Ignore both.
+- First generation downloads the model weights from Hugging Face.
 
 ---
 

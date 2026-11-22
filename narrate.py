@@ -94,7 +94,8 @@ def split_text(text: str, max_chars: int) -> list[str]:
 # --------------------------------------------------------------------------- audio
 def run(cmd: list[str], cwd: str | None = None, env: dict | None = None) -> None:
     log("  $", " ".join(f'"{c}"' if " " in c else c for c in cmd))
-    r = subprocess.run(cmd, cwd=cwd, env=env)
+    # child output goes to stderr so that stdout stays clean for --json
+    r = subprocess.run(cmd, cwd=cwd, env=env, stdout=sys.stderr)
     if r.returncode != 0:
         raise RuntimeError(f"command failed ({r.returncode}): {cmd[0]}")
 

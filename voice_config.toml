@@ -40,7 +40,7 @@ rvc            = false
 [chatterbox]
 python         = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\venvs\chatterbox\Scripts\python.exe'
 device         = "cuda"
-ref_audio      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\wavs\session1_pt_01_0003.wav'
+ref_audio      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\wavs\Treino_pt_01_0053.wav'
 exaggeration   = 0.5      # 0.3 calmer ... 0.7 more expressive
 cfg_weight     = 0.5      # lower (0.3) = slower, more deliberate pacing
 seed           = 0
@@ -53,7 +53,7 @@ cli            = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\venvs\f5tts\Scri
 model          = "F5TTS_v1_Base"
 ckpt_file      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\F5-TTS\ckpts\ismar_pt\model_last.pt'
 vocab_file     = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\F5-TTS\data\ismar_pt_custom\vocab.txt'
-ref_audio      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\wavs\session1_pt_01_0003.wav'
+ref_audio      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\wavs\Treino_pt_01_0053.wav'
 ref_text       = "texto exato do clipe de referência."
 nfe_step       = 32
 rvc            = false
@@ -65,7 +65,7 @@ rvc            = false
 [rvc]
 cwd            = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\RVC'
 python         = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\RVC\.venv\Scripts\python.exe'
-model_name     = "ismar_e60_s2520.pth"
+model_name     = "ismar_e100_s4200.pth"
 index_path     = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\RVC\assets\indices\ismar_added_IVF1983_Flat_nprobe_1_ismar_v2.index'
 f0method       = "rmvpe"
 index_rate     = 0.5      # 0 = ignore the index, 1 = lean on it fully (can sound harsh)
