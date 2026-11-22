@@ -133,11 +133,15 @@ def spell_numbers(text: str, lang: str) -> str:
             else:
                 val = raw.replace(",", "")  # 1,234.5 -> 1234.5
             num = float(val) if "." in val else int(val)
-            return _num2words(num, lang=nlang) + (pct if is_pct else "")
+            tail = " " if (not is_pct and m.end() < len(m.string) and m.string[m.end()].isalpha()) else ""
+            return _num2words(num, lang=nlang) + (pct if is_pct else "") + tail
         except Exception:
             return m.group(0)
 
-    return re.sub(r"(\d[\d.,]*\d|\d)(\s?%)?", repl, text)
+    if lang == "pt":  # airship / model names such as "N9" or "N-9" are read "ene nove"
+        text = re.sub(r"\bN-?(\d+)\b", lambda m: "ene " + _num2words(int(m.group(1)), lang=nlang), text)
+    # leave digits that are glued to letters alone (AN-14, B52, ...): we cannot know how they are read
+    return re.sub(r"(?<![A-Za-zÀ-ÿ\d])(?<![A-Za-zÀ-ÿ]-)(\d[\d.,]*\d|\d)(\s?%)?", repl, text)
 
 
 def clean_text(text: str) -> str:
@@ -303,8 +307,13 @@ def main() -> int:
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td) / "w.wav"
             sf.write(tmp, audio, args.sr, subtype="PCM_16")
+            # decode to 16 kHz ourselves with ffmpeg, so faster-whisper's own decoder (PyAV) is not needed
+            tmp16 = Path(td) / "w16.wav"
+            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(tmp),
+                            "-ac", "1", "-ar", "16000", str(tmp16)], check=True)
+            audio16, _ = sf.read(tmp16, dtype="float32")
             segments, winfo = model.transcribe(
-                str(tmp), language=lang, word_timestamps=True, vad_filter=True,
+                audio16, language=lang, word_timestamps=True, vad_filter=True,
                 vad_parameters={"min_silence_duration_ms": 300}, beam_size=5,
                 condition_on_previous_text=False,
             )
@@ -350,6 +359,9 @@ def main() -> int:
                 reason = "no_text"
             row = dict(file=name, source=f.name, lang=lang, duration=round(dur, 2),
                        prob=round(c.prob, 3), text=text_tts, text_raw=text)
+            rep = re.search(r"\b(\w{3,})[.,;!?]\s+\1\b", text, re.IGNORECASE)
+            if rep or re.search(r"(?i)legenda|amara\.org|obrigado por assistir|inscreva-se", text):
+                row["suspect"] = True
             if reason:
                 sf.write(rej_dir / name, seg_audio, args.sr, subtype="PCM_16")
                 row["reason"] = reason
@@ -383,13 +395,14 @@ def main() -> int:
                     fh.write(f"{(wav_dir / r['file']).resolve()}|{r['text'].lower()}\n")
     fields = ["file", "source", "lang", "duration", "prob", "text", "text_raw"]
     with open(out / "metadata.csv", "w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=fields, delimiter="|")
+        w = csv.DictWriter(fh, fieldnames=fields, delimiter="|", extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
     with open(out / "review.csv", "w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields + ["reason"], delimiter="|", extrasaction="ignore")
         w.writeheader()
-        review = [dict(r, reason="check") for r in rows if r["prob"] < args.review_prob]
+        review = [dict(r, reason="repeat/hallucination?" if r.get("suspect") else "low confidence")
+                  for r in rows if r["prob"] < args.review_prob or r.get("suspect")]
         w.writerows(sorted(review, key=lambda r: r["prob"]) + rejected)
 
     # ---------------- summary
@@ -400,7 +413,7 @@ def main() -> int:
     if durs:
         print(f"  clip length: min {min(durs):.1f}s, median {np.median(durs):.1f}s, max {max(durs):.1f}s")
     print(f"  rejected: {len(rejected)} (see {rej_dir})")
-    print(f"  to check by ear: {sum(1 for r in rows if r['prob'] < args.review_prob)} (see review.csv)")
+    print(f"  to check by ear: {sum(1 for r in rows if r['prob'] < args.review_prob or r.get('suspect'))} (see review.csv)")
     print(f"\nWrote {out/'gptsovits.list'}, {f5_dir/'metadata.csv'}, {out/'metadata.csv'}")
     print("Tip: open review.csv, listen to those clips, and fix or delete lines in the lists if Whisper misheard.")
     return 0
