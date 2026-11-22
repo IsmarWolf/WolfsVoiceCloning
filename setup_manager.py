@@ -37,7 +37,8 @@ RVC_ZIP = f"https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebU
 CHATTERBOX_ZIP = f"https://github.com/resemble-ai/chatterbox/archive/{CHATTERBOX_COMMIT}.zip"
 PYPI = "https://pypi.org/simple"
 
-XTTS_PACKAGES = ["coqui-tts", "soundfile", "six"]
+INDEXTTS_ZIP = "https://github.com/index-tts/index-tts/archive/refs/heads/main.zip"  # not pinned: untested engine
+XTTS_PACKAGES = ["coqui-tts", "soundfile", "six", "transformers>=4.57,<5"]  # transformers 5 breaks the XTTS GPT cache
 F5_PACKAGES = ["f5-tts", "soundfile"]
 
 PROFILES = {
@@ -234,12 +235,17 @@ CHECKS = {
     "venv_xtts": lambda: has_pkg(P.VENVS / "xtts", "torch", "TTS", "six"),
     "xtts_models": lambda: (P.ROOT / "models" / "xtts" / "downloaded.ok").exists(),
     "venv_f5": lambda: has_pkg(P.VENVS / "f5", "torch", "f5_tts"),
+    "index_src": lambda: (P.ROOT / "engines_src" / "indextts" / "indextts" / "infer_v2_5.py").exists(),
+    "venv_index": lambda: has_pkg(P.VENVS / "index", "torch", "indextts", "omegaconf"),
+    "index_models": lambda: (P.ROOT / "models" / "indextts25" / "config.yaml").exists(),
     "f5_models": lambda: all((P.ROOT / "models" / "f5_ptbr" / n).exists() for n in ("model_last.pt", "vocab.txt")),
 }
 
 # Optional base voices (menu "Voz base"), installed one at a time, on demand. Not part of STEPS.
 ENGINE_STEPS = {
     "xtts": [("venv_xtts", "Ambiente do XTTS-v2 (PyTorch)", "~4 GB"), ("xtts_models", "Modelo XTTS-v2", "~2 GB")],
+    "index": [("index_src", "Código do IndexTTS", "~0,05 GB"), ("venv_index", "Ambiente do IndexTTS 2.5 (Python 3.11, PyTorch 2.8)", "~6 GB"),
+              ("index_models", "Pesos do IndexTTS 2.5", "~6 GB")],
     "f5": [("venv_f5", "Ambiente do F5-TTS (PyTorch)", "~4 GB"), ("f5_models", "Pesos pt-BR do F5-TTS", "~1,5 GB")],
 }
 
@@ -365,6 +371,19 @@ class Setup:
         self._sh("xtts_models", [str(P.venv_python(P.VENVS / "xtts")), "-W", "ignore",
                                  str(P.ROOT / "engines" / "xtts_server.py"), str(P.ROOT), "--download"], env=env)
 
+    # IndexTTS 2.5 (bilibili licence). UNTESTED: written from the project's README (Python <3.12, torch 2.8).
+    def step_index_src(self, prof: dict) -> None:
+        self._fetch_zip("index_src", INDEXTTS_ZIP, P.ROOT / "engines_src" / "indextts")
+
+    def step_venv_index(self, prof: dict) -> None:
+        py = self._make_venv("venv_index", P.VENVS / "index", python="3.11")
+        self._pip("venv_index", py, "torch==2.8.*", "torchaudio==2.8.*", "--index-url", prof["torch_index"], "--extra-index-url", PYPI)
+        self._pip("venv_index", py, "-e", str(P.ROOT / "engines_src" / "indextts"), "soundfile")
+
+    def step_index_models(self, prof: dict) -> None:
+        self._sh("index_models", [str(P.venv_python(P.VENVS / "index")), "-W", "ignore",
+                                  str(P.ROOT / "engines" / "index_server.py"), str(P.ROOT), "--download"])
+
     def step_venv_f5(self, prof: dict) -> None:
         py = self._torch_venv("venv_f5", "f5", prof)
         self._pip("venv_f5", py, *F5_PACKAGES)
@@ -417,14 +436,14 @@ class Setup:
     def _detail(self, sid: str, t: str) -> None:
         self.states[sid]["detail"] = t
 
-    def _make_venv(self, sid: str, venv: Path) -> Path:
+    def _make_venv(self, sid: str, venv: Path, python: str = "3.12") -> Path:
         py = P.venv_python(venv)
         if py.exists():
             return py
         uv = uv_cmd()
         if not uv:
             raise RuntimeError("uv não encontrado; rode o passo de ferramentas primeiro.")
-        self._sh(sid, [*uv, "venv", "--python", "3.12", "--seed", str(venv)])
+        self._sh(sid, [*uv, "venv", "--python", python, "--seed", str(venv)])
         return py
 
     def _pip(self, sid: str, py: Path, *args: str) -> None:

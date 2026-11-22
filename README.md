@@ -54,19 +54,19 @@ No cartão **Voz** você escolhe qual motor fala o texto antes do RVC converter 
 | Chatterbox multilíngue v3 | MIT | sim | sim | sim |
 | XTTS-v2 | Coqui Public Model License | não | sim | instala e gera áudio, qualidade não avaliada |
 | F5-TTS pt-BR (comunidade) | CC-BY-NC 4.0 | não | sim, só pt-BR | instala e gera áudio, qualidade não avaliada |
+| IndexTTS 2.5 | bilibili Model Use License | sim, com limites enormes | não (só en no estúdio) | **não**: instalador escrito, nunca executado |
 
 "Testado" para XTTS-v2 e F5-TTS quer dizer só isto: instalaram pelo app na RTX 5060 Ti, geraram uma frase em pt (cerca de 6 s, volume normal, sem trecho mudo) e nada mais. Se a voz soa bem ou parece com você, só o seu ouvido diz.
 
 As licenças não comerciais não impedem o uso pessoal, mas quem clonar o repo para monetizar deve ficar no Chatterbox. O app mostra o aviso antes de instalar.
 
-Outros que li e **não** integrei (licenças e READMEs oficiais; não é aconselhamento jurídico):
+Analisados e **sem instalador automático** (aparecem na lista "Outros motores analisados" do menu; licenças e documentação oficiais lidas, não é aconselhamento jurídico):
 
-| Motor | Situação |
+| Motor | Por que não tem botão |
 |---|---|
-| Fish Audio S2-Pro (4B) | Candidato: ~100 idiomas, cabe em 16 GB. Falta integrar (repositório e servidor próprios, Windows não validado). O Drama 3 (35B) não cabe. |
-| Higgs Audio v3 (4B) | Candidato: 100+ idiomas, licença só não comercial. Falta integrar (servidor SGLang-Omni, voltado a Linux). |
-| IndexTTS 2 / 2.5 | Não fala português (zh, en, ja, es, ar). |
-| CosyVoice 3 | Português não está na lista (zh, en, ja, ko, de, es, fr, it, ru). |
+| Higgs Audio v3 (4B) | Fala português (nível mais alto) e cabe em 16 GB. A licença libera criadores, inclusive conteúdo monetizado, com crédito a "Boson AI Higgs Audio" na descrição. Só que o servidor oficial (SGLang-Omni, vLLM-Omni) tem receita para Linux/Docker. Via WSL2 ou Docker daria para usar, mas isso ainda não está ligado ao estúdio. |
+| Fish Audio S2-Pro (4B) | Documentação pede 24 GB de GPU e Linux/WSL; uma placa de 16 GB fica abaixo. O Drama 3 (35B) pede 48 GB. |
+| CosyVoice 3 | Não lista português, e o repositório fixa PyTorch 2.3.1, sem kernels para a série RTX 50. |
 
 ## Como o checkpoint é escolhido
 
@@ -135,6 +135,6 @@ AMD, Intel and Apple GPUs are not supported by the automatic setup.
 
 **What the charts do and don't say:** the similarity score measures timbre only, not naturalness. On the author's voice the checkpoints score within about 0.86-0.88, and the one chosen by ear (epoch 100) scores slightly below epochs 30 and 60. The depth presets raise low-frequency energy, which was already above that of the real recordings, so they are a matter of taste, not a measured fix. The assistant that wrote this cannot listen to audio.
 
-**Base voice menu:** the Studio's *Voz* card picks the engine that speaks before RVC. Chatterbox pt-BR and multilingual v3 (MIT) are tested. XTTS-v2 (CPML) and F5-TTS pt-BR (CC-BY-NC) install with one click and are non-commercial; "tested" means only that they installed and produced a ~6 s clip on the author's RTX 5060 Ti, quality not judged. Fish S2-Pro and Higgs v3 are candidates not yet integrated; IndexTTS and CosyVoice have no Portuguese. Licence facts come from each project's own LICENSE and README; this is not legal advice.
+**Base voice menu:** the Studio's *Voz* card picks the engine that speaks before RVC. Chatterbox pt-BR and multilingual v3 (MIT) are tested. XTTS-v2 (CPML) and F5-TTS pt-BR (CC-BY-NC) install with one click and are non-commercial; "tested" means only that they installed and produced a ~6 s clip on the author's RTX 5060 Ti, quality not judged. IndexTTS 2.5 (English only) has an installer that was written from its README and never run. Higgs v3 (Portuguese, fits 16 GB, free for creators with credit) and Fish S2-Pro (needs 24 GB) have no Windows installer: their official servers are Linux/Docker/WSL. CosyVoice 3 has no Portuguese and pins an old PyTorch. Licence facts come from each project's own LICENSE and README; this is not legal advice.
 
 **Privacy:** voices, models, settings and presets are git-ignored; only code and text are in the repository.

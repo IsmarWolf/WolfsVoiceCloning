@@ -41,23 +41,30 @@ MODELS = {
         "max_chars": 180, "size": "~3 GB",
         "note": "Os pesos base do F5-TTS são não comerciais (dados Emilia) e o ajuste pt-BR mantém CC-BY-NC. Precisa da transcrição do trecho de referência; o app usa a da gravação enviada, quando existe. Só pt.",
     },
+    "index25": {
+        "engine": "index", "label": "IndexTTS 2.5 (bilibili)", "langs": ["en"],
+        "license": "bilibili Model Use License", "commercial": "sim",
+        "pt_br": "Não fala português (zh, en, ja, es, ar): só aparece para inglês", "tested": "não",
+        "max_chars": 200, "size": "~12 GB",
+        "note": "Instalador escrito a partir do README do projeto, NUNCA executado. Pede Python 3.11 e PyTorch 2.8; se falhar, o log fica em out/setup. Licença permite uso comercial abaixo de 100 milhões de usuários ativos ou RMB 1 bilhão de faturamento.",
+    },
 }
 
-ENGINE_LABELS = {"chatterbox": "Chatterbox", "xtts": "XTTS-v2", "f5": "F5-TTS"}
+ENGINE_LABELS = {"chatterbox": "Chatterbox", "xtts": "XTTS-v2", "f5": "F5-TTS", "index": "IndexTTS 2.5"}
 
 CATALOG = [
+    {"label": "Higgs Audio v3 TTS (4B, Boson AI)", "license": "Boson Higgs TTS 3 Research and Non-Commercial License, com Creator Use Grant",
+     "commercial": "limitado", "pt_br": "Sim: português está entre os 85 idiomas de nível mais alto",
+     "status": "Sem instalação automática (Linux)",
+     "why": "Cabe na placa de 16 GB (4B em bf16). A licença libera criadores de conteúdo, inclusive monetizado, de graça, desde que credite 'Boson AI Higgs Audio' no áudio ou na descrição; proíbe clonar voz sem consentimento. O servidor oficial (SGLang-Omni ou vLLM-Omni) só tem receita para Linux/Docker, então o app não instala no Windows. Via WSL2 ou Docker, dá para subir o servidor e usar o endpoint /v1/audio/speech (ainda não ligado ao estúdio)."},
     {"label": "Fish Audio S2-Pro (4B)", "license": "Fish Audio Research License (não comercial)",
      "commercial": "não", "pt_br": "Cerca de 100 idiomas, português incluído (pt-BR não verificado)",
-     "why": "Candidato: cabe numa placa de 16 GB e a licença serve para uso pessoal. Ainda não integrado: precisa do repositório fish-speech e do servidor próprio, e a instalação no Windows não foi validada. O Drama 3 (35B) não cabe em 16 GB."},
-    {"label": "Higgs Audio v3 (4B)", "license": "Boson Higgs Audio v3 Research and Non-Commercial License",
-     "commercial": "não", "pt_br": "Cita mais de 100 idiomas (pt-BR não verificado)",
-     "why": "Candidato: licença serve para uso pessoal. Ainda não integrado: o servidor recomendado (SGLang-Omni) é voltado a Linux e não foi validado no Windows. O v2 é focado em en, zh, de e ko."},
-    {"label": "IndexTTS 2 / 2.5", "license": "bilibili Model Use License",
-     "commercial": "sim", "pt_br": "Não: chinês, inglês, japonês, espanhol e árabe",
-     "why": "Não fala português."},
+     "status": "Sem instalação automática (24 GB, Linux/WSL)",
+     "why": "A documentação oficial pede pelo menos 24 GB de GPU e Linux ou WSL. Sua placa tem 16 GB, então não é viável de forma suportada. O Drama 3 (35B) pede 48 GB."},
     {"label": "CosyVoice 3 (Fun-CosyVoice3)", "license": "Apache 2.0 (código)",
-     "commercial": "sim", "pt_br": "Não na lista oficial (zh, en, ja, ko, de, es, fr, it, ru)",
-     "why": "Português não está entre os idiomas suportados. Não foi validado se o modo entre-idiomas serve."},
+     "commercial": "sim", "pt_br": "Não: zh, en, ja, ko, de, es, fr, it, ru",
+     "status": "Sem instalação automática (sem português, PyTorch antigo)",
+     "why": "O repositório fixa PyTorch 2.3.1, que não tem kernels para as placas RTX 50, e a instalação oficial é Conda no Linux. Também não lista português."},
 ]
 
 ENGINE_PY_NAMES = {"xtts": "xtts", "f5": "f5"}

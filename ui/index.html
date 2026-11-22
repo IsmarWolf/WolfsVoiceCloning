@@ -73,10 +73,10 @@
   .vcard .vh { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
   .engine { margin: -2px 0 12px; padding: 10px 12px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: 10px; font-size: .82rem; line-height: 1.45; }
   .engine .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-  .engine .tag { font-size: .7rem; padding: 2px 9px; border-radius: 99px; border: 1px solid rgba(255,255,255,.2); }
-  .engine .tag.good { color: var(--good); border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.12); }
-  .engine .tag.warn { color: #ffb86b; border-color: rgba(255,184,107,.45); background: rgba(255,184,107,.12); }
-  .engine .tag.bad { color: #ff7b7b; border-color: rgba(255,123,123,.45); background: rgba(255,123,123,.12); }
+  .engine .tag, .more .tag { font-size: .7rem; padding: 2px 9px; border-radius: 99px; border: 1px solid rgba(255,255,255,.2); }
+  .engine .tag.good, .more .tag.good { color: var(--good); border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.12); }
+  .engine .tag.warn, .more .tag.warn { color: #ffb86b; border-color: rgba(255,184,107,.45); background: rgba(255,184,107,.12); }
+  .engine .tag.bad, .more .tag.bad { color: #ff7b7b; border-color: rgba(255,123,123,.45); background: rgba(255,123,123,.12); }
   .engine .row2 { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
   .more { margin: 0 0 12px; font-size: .8rem; } .more summary { cursor: pointer; opacity: .8; }
   .more .cat { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
@@ -228,7 +228,7 @@
         <select id="model"></select>
       </label>
       <div id="engineInfo" class="engine"></div>
-      <details class="more"><summary>Outros motores que analisei (não instaláveis)</summary><div id="catalog"></div></details>
+      <details class="more"><summary>Outros motores analisados (sem instalador automático)</summary><div id="catalog"></div></details>
       <label class="f">Trecho de referência
         <div class="refline">
           <select id="ref"></select>
@@ -596,7 +596,7 @@ function renderEngine() {
   $("engineInfo").innerHTML = `<div class="tags"><span class="tag ${c[0]}">${esc(c[1])}</span><span class="tag">${esc(m.license)}</span><span class="tag ${m.tested === "sim" ? "good" : "warn"}">${m.tested === "sim" ? "testado" : m.tested === "tecnico" ? "instala e gera áudio; qualidade não avaliada" : "não testado"}</span></div>
     <div>Português do Brasil: ${esc(m.pt_br)}.</div><div style="opacity:.8">${esc(m.note)}</div>${act}`;
   $("sliders").style.opacity = m.engine === "chatterbox" ? 1 : .45;
-  $("catalog").innerHTML = (S.catalog || []).map(x => `<div class="cat"><b>${esc(x.label)}</b><div>Licença: ${esc(x.license)}</div><div>pt-BR: ${esc(x.pt_br)}</div><div style="opacity:.8">${esc(x.why)}</div></div>`).join("");
+  $("catalog").innerHTML = (S.catalog || []).map(x => `<div class="cat"><b>${esc(x.label)}</b> <span class="tag warn">${esc(x.status || "")}</span><div>Licença: ${esc(x.license)}</div><div>pt-BR: ${esc(x.pt_br)}</div><div style="opacity:.8">${esc(x.why)}</div></div>`).join("");
 }
 $("engineInfo").onclick = async (e) => {
   const b = e.target.closest("button"); if (!b) return;
