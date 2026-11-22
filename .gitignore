@@ -1,0 +1,25 @@
+# recordings, datasets and generated audio (keep your voice data out of git)
+raw/
+dataset/
+out/
+*.wav
+*.mp3
+*.flac
+*.m4a
+
+# models and checkpoints
+*.pth
+*.ckpt
+*.pt
+*.safetensors
+*.index
+
+# third-party clones and environments
+GPT-SoVITS/
+RVC/
+F5-TTS/
+venvs/
+.venv/
+__pycache__/
+*.pyc
+*.log
