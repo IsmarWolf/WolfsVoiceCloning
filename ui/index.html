@@ -44,7 +44,39 @@
   .dot.busy { background: var(--warn); box-shadow: 0 0 10px var(--warn); animation: pulse 1s infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
 
-  main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 22px;
+  .tabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); }
+  .tabs button { border: 0; background: transparent; color: var(--muted); padding: 8px 18px; border-radius: 10px; font-size: .92rem; font-weight: 600; }
+  .tabs button:hover { color: var(--text); }
+  .tabs button.on { background: var(--grad); color: #fff; box-shadow: 0 4px 16px rgba(139,92,246,.35); }
+  main.single { display: block; max-width: 860px; }
+  main.single .card { margin-bottom: 18px; }
+  .num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--grad); color: #fff; font-size: .75rem; margin-right: 8px; letter-spacing: 0; }
+  .steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+  .steps li { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: baseline; font-size: .88rem; padding: 6px 0; border-top: 1px solid var(--line); }
+  .steps li:first-child { border-top: 0; }
+  .steps .d { grid-column: 2 / 4; color: var(--faint); font-size: .75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -2px; }
+  .ic { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--faint); display: inline-block; position: relative; top: 2px; }
+  .ic.done { background: var(--good); border-color: var(--good); } .ic.done::after { content: "✓"; position: absolute; inset: -3px 0 0 2px; font-size: 11px; color: #052; font-weight: 700; }
+  .ic.running { border-color: var(--a2); border-top-color: transparent; animation: spin .8s linear infinite; }
+  .ic.error { background: var(--bad); border-color: var(--bad); } .ic.skip { opacity: .35; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .note { font-size: .82rem; color: var(--muted); margin: 10px 0 0; }
+  .note.warn { color: var(--warn); } .note.good { color: var(--good); }
+  .drop { border: 2px dashed var(--line); border-radius: 16px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; transition: .15s; }
+  .drop:hover, .drop.over { border-color: var(--a1); color: var(--text); background: rgba(139,92,246,.07); }
+  .files { margin-top: 10px; display: grid; gap: 4px; } .files .fr { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; align-items: center; padding: 4px 2px; }
+  .meter { height: 10px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 10px; } .meter i { display: block; height: 100%; background: var(--grad); }
+  input[type=text] { width: 100%; padding: 9px 11px; border-radius: 11px; font: inherit; font-size: .9rem; color: var(--text); background: color-mix(in srgb, var(--bg2) 75%, transparent); border: 1px solid var(--line); outline: none; }
+  input[type=text]:focus { border-color: var(--a1); box-shadow: 0 0 0 3px rgba(139,92,246,.22); }
+  details { margin-top: 12px; color: var(--muted); font-size: .85rem; } details summary { cursor: pointer; } details ul { margin: 8px 0 0 18px; padding: 0; }
+  .vcard { border-top: 1px solid var(--line); padding: 14px 0; } .vcard:first-child { border-top: 0; padding-top: 0; }
+  .vcard .vh { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .badge { font-size: .7rem; padding: 2px 9px; border-radius: 99px; background: rgba(52,211,153,.15); color: var(--good); border: 1px solid rgba(52,211,153,.35); margin-left: 8px; }
+  table.rank { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .84rem; } table.rank td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: middle; }
+  table.rank audio { height: 32px; min-width: 160px; } .sbar { height: 6px; border-radius: 9px; background: rgba(255,255,255,.08); min-width: 70px; } .sbar i { display: block; height: 100%; border-radius: 9px; background: var(--grad); }
+  tr.chosen td { background: rgba(139,92,246,.10); }
+  .banner { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+  main {  display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); gap: 22px;
          padding: 24px clamp(16px, 4vw, 40px) 60px; max-width: 1280px; margin: 0 auto; align-items: start; }
   @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
   .stack { display: grid; gap: 18px; }
@@ -133,11 +165,14 @@
     </div>
     <div><h1>Wolf Voice Studio</h1><p>sua voz, sob controle</p></div>
   </div>
-  <div class="pills" id="pills"></div>
+  <nav class="tabs" id="tabs"><button data-tab="studio" class="on">Estúdio</button><button data-tab="clone">Clonar voz</button></nav>
 </header>
 
-<main>
+<main id="tabStudio">
   <div class="stack">
+    <section class="card banner" id="noVoice" hidden>
+      <span>Ainda não há uma voz clonada neste computador.</span><button class="primary" id="goClone" style="font-size:.9rem;padding:9px 18px">Clonar minha voz</button>
+    </section>
     <section class="card">
       <div class="head">
         <h2>Texto</h2>
@@ -225,6 +260,66 @@
     </section>
   </aside>
 </main>
+
+<main id="tabClone" class="single" hidden>
+  <section class="card">
+    <h2><span class="num">1</span>Seu computador</h2>
+    <div id="hw" class="note" style="margin-top:0"></div>
+    <label class="f" style="margin-top:14px">Perfil de instalação
+      <div class="seg" id="profSeg"></div>
+    </label>
+    <div class="note" id="profNote"></div>
+    <label class="switch" style="margin-top:14px"><input type="checkbox" id="withRvc"> Treinar o meu timbre com RVC (mais parecido com você, mas mais lento e mais pesado)</label>
+    <ul class="steps" id="steps"></ul>
+    <div class="err" id="setupErr" hidden></div>
+    <div class="row" style="margin-top:14px"><button class="primary" id="install">Instalar o que falta</button><button class="ghost" id="installCancel" hidden>Cancelar</button><span class="hint" id="installHint"></span></div>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">2</span>Sua voz</h2>
+    <label class="f" style="margin-top:0">Voz
+      <select id="vSel"></select>
+    </label>
+    <label class="f" id="vNameBox" hidden>Nome da nova voz
+      <input type="text" id="vName" maxlength="40" placeholder="ex.: minha voz">
+    </label>
+    <div class="drop" id="drop" style="margin-top:14px">Arraste suas gravações aqui ou clique para escolher<br><span class="hint">áudio ou vídeo, qualquer formato (m4a, mp3, wav, mp4…), vários arquivos de uma vez</span>
+      <input type="file" id="recFile" accept="audio/*,video/*" multiple hidden></div>
+    <div class="progress" id="upProg" hidden><div class="bar"><i></i></div><div class="stage"><span id="upStage"></span></div></div>
+    <div class="files" id="recList"></div>
+    <div class="meter"><i id="meterFill" style="width:0"></i></div>
+    <div class="note" id="meterNote">Nenhuma gravação ainda.</div>
+    <details><summary>Como gravar para o melhor resultado</summary><ul>
+      <li>Ideal: 20 a 30 minutos falando naturalmente, no mesmo microfone, num lugar silencioso e sem eco.</li>
+      <li>Leia textos variados, com perguntas, pausas e entusiasmo, como nos seus vídeos. Evite sussurro e grito.</li>
+      <li>Só você falando: sem música, sem outra voz, sem TV ao fundo.</li>
+      <li>Com menos de 5 minutos, use só o Chatterbox (sem RVC). Entre 5 e 15 minutos o RVC funciona, mas fica mais fraco.</li>
+    </ul></details>
+  </section>
+
+  <section class="card">
+    <h2><span class="num">3</span>Clonar</h2>
+    <div class="grid2">
+      <label class="f" style="margin:0">Idioma da gravação
+        <select id="cLang"><option value="auto">Detectar sozinho</option><option value="pt">Português</option><option value="en">English</option></select>
+      </label>
+      <label class="f" style="margin:0">Épocas de treino do RVC
+        <input type="number" id="cEpochs" min="5" max="400" step="5">
+        <div class="hint">Cada época salva um checkpoint; o app escolhe o melhor, sem passar do ponto.</div>
+      </label>
+    </div>
+    <div class="note" id="timeNote"></div>
+    <div class="row" style="margin-top:14px"><button class="primary" id="cloneGo">Clonar minha voz</button><button class="ghost" id="cloneCancel" hidden>Cancelar</button></div>
+    <ul class="steps" id="cStages" hidden></ul>
+    <div class="progress" id="cProg" hidden><div class="bar" id="cBar"><i></i></div><div class="stage"><span id="cStage"></span><span id="cTimer"></span></div><div class="hint" id="cDetail" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div></div>
+    <div class="err" id="cErr" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2>Minhas vozes</h2>
+    <div id="vList"><div class="empty">Nenhuma voz ainda.</div></div>
+  </section>
+</main>
 <div id="toast"></div>
 
 <script>
@@ -291,6 +386,16 @@ function fillSelect(sel, items, value, labelFn) {
   sel.innerHTML = items.map(i => `<option value="${esc(i.v)}">${esc(i.l)}</option>`).join("");
   if (items.some(i => i.v === value)) sel.value = value;
 }
+function fixCfg() {  // keep the saved settings valid for the active voice
+  const av = S.active_voice ? S.active_voice.name : "";
+  if (cfg.voice !== av) { cfg.voice = av; cfg.ref = ""; cfg.rvc_model = ""; cfg.index = ""; cfg.rvc = S.rvc_models.length > 0; }
+  if (!S.refs.some(r => r.id === cfg.ref)) cfg.ref = S.ref_default || (S.refs[0] && S.refs[0].id) || "";
+  if (!S.rvc_models.includes(cfg.rvc_model)) cfg.rvc_model = S.rvc_default || S.rvc_models[S.rvc_models.length - 1] || "";
+  if (cfg.index && !S.indices.includes(cfg.index)) cfg.index = "";
+  if (!cfg.index) cfg.index = S.index_default || "";
+  if (!S.rvc_models.length) cfg.rvc = false;
+  save();
+}
 function applyCfg() {
   $("text").value = cfg.text || "";
   document.querySelectorAll("#lang button").forEach(b => b.classList.toggle("on", b.dataset.v === cfg.lang));
@@ -300,6 +405,7 @@ function applyCfg() {
   $("ref").value = cfg.ref; if ($("ref").value !== cfg.ref) { cfg.ref = $("ref").value; }
   showRefText();
   SLIDERS.concat(RVC_SLIDERS).forEach(s => s.sync && s.sync());
+  $("rvc").disabled = !S.rvc_models.length; $("rvc").title = S.rvc_models.length ? "" : "Esta voz não tem treino de timbre (RVC).";
   $("seed").value = cfg.seed; $("format").value = cfg.format; $("rvc").checked = cfg.rvc; $("compare").checked = cfg.compare;
   $("rvcModel").value = cfg.rvc_model; $("index").value = cfg.index;
   $("rvcBox").style.opacity = cfg.rvc ? 1 : .4; $("rvcBox").style.pointerEvents = cfg.rvc ? "" : "none";
@@ -329,14 +435,8 @@ function renderSelects() {
 }
 
 function updatePills() {
-  const w = S.workers, g = S.gpu, busy = job && ["queued", "running"].includes(job.status);
-  const m = (k) => ({ ptbr: "pt-BR", v3: "multilíngue v3" }[k] || k);
-  const pills = [
-    [w.chatterbox.loaded ? "on" : (busy ? "busy" : ""), w.chatterbox.loaded ? `Chatterbox · ${m(w.chatterbox.loaded)}` : "Chatterbox · descarregado"],
-    [w.rvc.loaded ? "on" : (busy ? "busy" : ""), w.rvc.loaded ? `RVC · época ${(w.rvc.loaded.match(/_e(\d+)/) || [])[1] || "?"}` : "RVC · descarregado"],
-  ];
-  if (g) pills.push(["on", `${g.name} · ${g.used_gb}/${g.total_gb} GB`]);
-  $("pills").innerHTML = pills.map(p => `<span class="pill"><i class="dot ${p[0]}"></i>${esc(p[1])}</span>`).join("");
+  const w = S.workers;
+  $("noVoice").hidden = !!S.active_voice;
   $("preHint").textContent = w.chatterbox.loaded && (!cfg.rvc || w.rvc.loaded) ? "Modelos carregados: a geração é rápida." : "Os modelos carregam na primeira geração (~30 s).";
 }
 
@@ -369,7 +469,7 @@ function renderHistory() {
 async function refreshState(full) {
   try {
     const prev = S; S = await api.get("/api/state");
-    if (full || !prev) { renderSelects(); applyCfg(); }
+    if (full || !prev) { fixCfg(); renderSelects(); applyCfg(); }
     updatePills();
     return true;
   } catch (e) { return false; }
@@ -445,12 +545,191 @@ $("history").onclick = async (e) => {
   buildSliders(SLIDERS, $("sliders")); buildSliders(RVC_SLIDERS, $("rvcSliders"));
   try { S = await api.get("/api/state"); } catch (e) { $("history").innerHTML = `<div class="empty">Não consegui falar com o servidor local.</div>`; return; }
   cfg = { ...defaults(), ...load() };
-  if (!S.refs.some(r => r.id === cfg.ref)) cfg.ref = S.ref_default || (S.refs[0] && S.refs[0].id) || "";
-  if (!S.rvc_models.includes(cfg.rvc_model)) cfg.rvc_model = S.rvc_default || S.rvc_models[S.rvc_models.length - 1] || "";
-  if (!S.indices.includes(cfg.index) && cfg.index) cfg.index = S.index_default || "";
+  fixCfg();
   renderSelects(); applyCfg(); renderHistory(); updatePills();
   setInterval(() => { if (!document.hidden) refreshState(false); }, 5000);
 })();
+</script>
+<script>
+// ======================================================= tabs
+function showTab(t) {
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
+  $("tabStudio").hidden = t !== "studio"; $("tabClone").hidden = t !== "clone";
+  try { localStorage.setItem("wvs.tab", t); } catch (e) {}
+  if (t === "clone") { pollClone(); } else if (typeof refreshState === "function") { refreshState(true); }
+}
+$("tabs").onclick = (e) => { const b = e.target.closest("button"); if (b) showTab(b.dataset.tab); };
+$("goClone").onclick = () => showTab("clone");
+
+// ======================================================= clone tab
+let SU = null, V = null, curVoice = "", profile = null, cJob = null, cT0 = 0, upBusy = false;
+const STAGE_LABEL = { prepare: "Transcrever e cortar a gravação", ref: "Escolher o trecho de referência", train: "Treinar o seu timbre (RVC)", pick: "Comparar checkpoints com a sua voz", final: "Ativar a voz" };
+
+function icon(state) { return `<i class="ic ${state === "done" ? "done" : state === "running" ? "running" : state === "error" ? "error" : ""}"></i>`; }
+
+function renderSetup() {
+  const h = SU.hardware, g = h.gpu;
+  $("hw").innerHTML = `${g ? `<b>${esc(g.name)}</b> · ${g.memory_gb} GB · driver ${esc(g.driver)}` : "<b>Sem placa NVIDIA detectada</b>"} · ${h.cpu_count} threads · ${h.disk_free_gb ?? "?"} GB livres<br>${esc(h.note)}`;
+  if (!profile) profile = SU.profile || h.recommended;
+  $("profSeg").innerHTML = Object.entries(SU.profiles).map(([k, p]) => `<button data-p="${k}" class="${k === profile ? "on" : ""}">${esc(p.label)}${k === h.recommended ? " · recomendado" : ""}</button>`).join("");
+  const pr = SU.profiles[profile];
+  $("profNote").textContent = pr.tested; $("profNote").className = "note " + (profile === "cuda" && h.gpu && parseFloat(h.gpu.compute) >= 12 ? "good" : "warn");
+  if (!renderSetup.touched) $("withRvc").checked = SU.profile ? SU.with_rvc : pr.default_rvc;
+  const withRvc = $("withRvc").checked;
+  $("steps").innerHTML = SU.steps.map(s => {
+    const skipped = s.needs_rvc && !withRvc && s.state !== "done";
+    return `<li style="${skipped ? "opacity:.45" : ""}">${icon(skipped ? "skip" : s.state)}<span>${esc(s.label)}${skipped ? " · não necessário sem RVC" : ""}</span><span class="hint">${esc(s.size)}</span>${s.state === "running" || s.state === "error" ? `<span class="d">${esc(s.detail)}</span>` : ""}</li>`;
+  }).join("");
+  $("setupErr").hidden = !SU.error; $("setupErr").textContent = SU.error || "";
+  const need = SU.steps.filter(s => !(s.needs_rvc && !withRvc) && s.state !== "done").length;
+  $("install").disabled = SU.running || (need === 0 && SU.profile === profile && SU.with_rvc === withRvc); $("installCancel").hidden = !SU.running;
+  $("install").textContent = SU.running ? "Instalando…" : need > 0 ? "Instalar o que falta" : SU.profile === profile && SU.with_rvc === withRvc ? "Tudo instalado ✓" : "Salvar escolha";
+  $("installHint").textContent = SU.running ? "Pode levar muitos minutos; os downloads somam vários GB." : need ? `${need} passo(s) pendente(s)` : "";
+  $("profSeg").style.pointerEvents = SU.running ? "none" : "";
+}
+$("profSeg").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; profile = b.dataset.p; renderSetup.touched = false; $("withRvc").checked = SU.profiles[profile].default_rvc; renderSetup(); renderTimeNote(); };
+$("withRvc").onchange = () => { renderSetup.touched = true; renderSetup(); renderTimeNote(); };
+$("install").onclick = async () => { try { await api.post("/api/setup/start", { profile, with_rvc: $("withRvc").checked }); await pollSetup(); } catch (e) { toast(e.message, true); } };
+$("installCancel").onclick = () => api.post("/api/setup/cancel");
+
+function totalSeconds() { const v = V && V.voices.find(x => x.name === curVoice); return v ? v.recordings.reduce((a, r) => a + r.seconds, 0) : 0; }
+function renderTimeNote() {
+  if (!SU) return;
+  const rvc = $("withRvc").checked, gpu = profile === "cuda", min = totalSeconds() / 60;
+  $("cEpochs").parentElement.style.display = rvc ? "" : "none";
+  if (!$("cEpochs").dataset.set || $("cEpochs").dataset.prof !== profile) { $("cEpochs").value = gpu ? 100 : 30; $("cEpochs").dataset.set = 1; $("cEpochs").dataset.prof = profile; }
+  $("timeNote").textContent = !rvc ? "Sem RVC: a clonagem é rápida (transcrever e escolher um trecho). A voz sai do Chatterbox, usando seu trecho como referência."
+    : gpu ? "Referência medida na RTX 5060 Ti com 33 min de áudio: cerca de 20 s por época, ~35 min para 100 épocas, mais o preparo. Outras placas variam."
+    : "Na CPU o treino leva horas (não medimos). Se der, deixe rodando e não use o computador para outra coisa.";
+  $("cloneGo").disabled = !SU.ready || !curVoice || min < 1 || (cJob && ["queued", "running"].includes(cJob.status));
+  $("cloneGo").title = !SU.ready ? "Termine a instalação (passo 1)." : min < 1 ? "Envie pelo menos 1 minuto de gravação." : "";
+}
+
+function meterNote(min) {
+  let t, cls = "";
+  if (min <= 0) t = "Nenhuma gravação ainda.";
+  else if (min < 1) { t = `${min.toFixed(1)} min: pouco demais. Envie pelo menos 1 minuto.`; cls = "warn"; }
+  else if (min < 5) { t = `${min.toFixed(1)} min: dá para clonar só com o Chatterbox. Para o RVC, grave mais.`; cls = "warn"; }
+  else if (min < 15) { t = `${min.toFixed(1)} min: o RVC funciona, mas fica mais fraco. 20 a 30 min é o ideal.`; cls = "warn"; }
+  else if (min < 20) t = `${min.toFixed(1)} min: bom. Perto de 30 min fica melhor ainda.`;
+  else { t = `${min.toFixed(1)} min: ótimo.`; cls = "good"; }
+  $("meterNote").textContent = t; $("meterNote").className = "note " + cls;
+  $("meterFill").style.width = Math.min(100, min / 30 * 100) + "%";
+}
+function renderVoiceSel() {
+  const opts = V.voices.map(v => ({ v: v.name, l: v.display + (v.active ? " (ativa)" : "") })).concat([{ v: "__new", l: "＋ Nova voz…" }]);
+  if (!curVoice || (curVoice !== "__new" && !V.voices.some(v => v.name === curVoice))) curVoice = V.active || (V.voices[0] && V.voices[0].name) || "__new";
+  fillSelect($("vSel"), opts, curVoice); $("vSel").value = curVoice;
+  $("vNameBox").hidden = curVoice !== "__new";
+  const v = V.voices.find(x => x.name === curVoice);
+  const recs = v ? v.recordings : [];
+  $("recList").innerHTML = recs.map(r => `<div class="fr"><span>${esc(r.file)} · ${fmtDur(r.seconds)}</span><button class="ghost small danger" data-rm="${esc(r.file)}">remover</button></div>`).join("");
+  meterNote(recs.reduce((a, r) => a + r.seconds, 0) / 60);
+}
+$("vSel").onchange = () => { curVoice = $("vSel").value; renderVoiceSel(); renderTimeNote(); };
+$("recList").onclick = async (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; await api.post("/api/voice/remove_recording", { voice: curVoice, file: b.dataset.rm }); await pollVoices(); };
+
+function xhrUpload(url, file, onProg) {
+  return new Promise((res, rej) => {
+    const x = new XMLHttpRequest(); x.open("POST", url); x.setRequestHeader("X-Studio", "1");
+    x.upload.onprogress = (e) => e.lengthComputable && onProg(e.loaded / e.total);
+    x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (e) {} x.status < 300 ? res(j) : rej(new Error(j.error || x.statusText)); };
+    x.onerror = () => rej(new Error("Falha no envio.")); x.send(file);
+  });
+}
+async function uploadFiles(files) {
+  if (upBusy || !files.length) return; upBusy = true;
+  try {
+    if (curVoice === "__new") {
+      const display = $("vName").value.trim(); if (!display) { toast("Dê um nome para a nova voz primeiro.", true); return; }
+      const v = await api.post("/api/voice/create", { display }); curVoice = v.name;
+    }
+    $("upProg").hidden = false;
+    for (let i = 0; i < files.length; i++) {
+      $("upStage").textContent = `Enviando e convertendo ${i + 1}/${files.length}: ${files[i].name}`;
+      const bar = $("upProg").querySelector("i"); bar.style.width = "0";
+      try { await xhrUpload(`/api/voice/upload?voice=${encodeURIComponent(curVoice)}&name=${encodeURIComponent(files[i].name)}`, files[i], p => bar.style.width = Math.round(p * 100) + "%"); }
+      catch (e) { toast(`${files[i].name}: ${e.message}`, true); }
+    }
+  } catch (e) { toast(e.message, true); } finally { upBusy = false; $("upProg").hidden = true; await pollVoices(); }
+}
+$("drop").onclick = () => $("recFile").click();
+$("recFile").onchange = () => { uploadFiles([...$("recFile").files]); $("recFile").value = ""; };
+["dragover", "dragenter"].forEach(ev => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => $("drop").addEventListener(ev, (e) => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", (e) => uploadFiles([...e.dataTransfer.files]));
+
+// ---- clone job
+$("cloneGo").onclick = async () => {
+  $("cErr").hidden = true;
+  try {
+    const body = { voice: curVoice, rvc: $("withRvc").checked, lang: $("cLang").value };
+    if (body.rvc) body.epochs = +$("cEpochs").value;
+    const r = await api.post("/api/voice/clone", body); cJob = { id: r.id, status: "queued" }; cT0 = performance.now(); renderCloneJob();
+  } catch (e) { toast(e.message, true); }
+};
+$("cloneCancel").onclick = () => cJob && api.post("/api/cancel", { id: cJob.id });
+function renderCloneJob() {
+  const j = cJob, active = j && ["queued", "running"].includes(j.status);
+  $("cloneCancel").hidden = !active;
+  const show = !!j && (active || j.status === "error" || j.status === "cancelled");
+  $("cProg").hidden = !show; $("cStages").hidden = !show || !j.stages;
+  if (!j) return;
+  if (j.stages) $("cStages").innerHTML = j.stages.map(s => `<li>${icon(s.state)}<span>${esc(STAGE_LABEL[s.id] || s.id)}</span><span></span></li>`).join("");
+  const pr = j.progress, bar = $("cBar");
+  $("cStage").textContent = (j.status === "queued" ? "Na fila…" : j.stage || "") + (pr && pr[1] ? ` ${pr[0]}/${pr[1]}` : "");
+  if (pr && pr[1]) { bar.classList.remove("indet"); bar.firstElementChild.style.width = Math.round(100 * pr[0] / pr[1]) + "%"; } else { bar.classList.add("indet"); bar.firstElementChild.style.width = ""; }
+  $("cDetail").textContent = j.detail || "";
+  $("cTimer").textContent = active ? fmtDur((performance.now() - cT0) / 1000) : "";
+  $("cErr").hidden = j.status !== "error"; $("cErr").textContent = j.error || "";
+}
+
+// ---- voices list
+function renderVoices() {
+  if (!V.voices.length) { $("vList").innerHTML = `<div class="empty">Nenhuma voz ainda. Faça os passos acima.</div>`; return; }
+  $("vList").innerHTML = V.voices.map(v => {
+    const rows = v.ranking.map(r => {
+      const chosen = v.rvc && v.rvc.model === r.ckpt, w = Math.max(4, Math.round((r.score - 0.5) / 0.5 * 100));
+      return `<tr class="${chosen ? "chosen" : ""}"><td>época ${r.epoch}${chosen ? " ✓" : ""}</td><td><div class="sbar"><i style="width:${Math.min(100, w)}%"></i></div></td><td>${r.score.toFixed(3)}</td>
+        <td><audio controls preload="none" src="/file/voice/${encodeURIComponent(v.name)}/${r.file}"></audio></td>
+        <td>${chosen ? "" : `<button class="ghost small" data-ck="${esc(r.ckpt)}" data-v="${esc(v.name)}">usar este</button>`}</td></tr>`;
+    }).join("");
+    const base = v.base_score ? `<tr><td>Chatterbox puro</td><td><div class="sbar"><i style="width:${Math.min(100, Math.max(4, Math.round((v.base_score.score - 0.5) / 0.5 * 100)))}%"></i></div></td><td>${v.base_score.score.toFixed(3)}</td><td><audio controls preload="none" src="/file/voice/${encodeURIComponent(v.name)}/${v.base_score.file}"></audio></td><td>${v.rvc ? `<button class="ghost small" data-off="${esc(v.name)}">sem RVC</button>` : "<span class='hint'>em uso</span>"}</td></tr>` : "";
+    return `<div class="vcard"><div class="vh"><div><b>${esc(v.display)}</b>${v.active ? `<span class="badge">ativa no estúdio</span>` : ""}
+      <div class="hint">${v.status === "ready" ? "pronta" : v.status === "working" ? "clonando…" : v.status === "interrupted" ? "interrompida (clonar de novo continua de onde parou)" : "sem clonagem ainda"} · ${fmtDur(v.recordings.reduce((a, r) => a + r.seconds, 0))} enviados${v.dataset_minutes ? ` · ${v.dataset_minutes} min aproveitados` : ""} · ${v.rvc ? "RVC: " + esc(v.rvc.model) : "só Chatterbox"}</div></div>
+      <div class="row">${v.status === "ready" && !v.active ? `<button class="primary" style="font-size:.85rem;padding:8px 16px" data-use="${esc(v.name)}">Usar no estúdio</button>` : ""}${v.active ? `<button class="ghost" data-studio="1">Abrir o estúdio</button>` : ""}</div></div>
+      ${v.note ? `<div class="note warn">${esc(v.note)}</div>` : ""}
+      ${rows ? `<details open><summary>Checkpoints por semelhança com a sua voz</summary>
+        <div class="hint" style="margin-top:6px">A nota (0 a 1) mede só o timbre; ela não ouve chiado nem robotização. O app escolhe o checkpoint mais cedo entre os que empatam com o melhor. Ouça e troque se preferir.</div>
+        <table class="rank">${base}${rows}</table></details>` : ""}</div>`;
+  }).join("");
+}
+$("vList").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  try {
+    if (b.dataset.use) { await api.post("/api/voice/activate", { voice: b.dataset.use }); toast("Voz ativada no estúdio."); }
+    else if (b.dataset.ck) { await api.post("/api/voice/checkpoint", { voice: b.dataset.v, ckpt: b.dataset.ck }); toast("Checkpoint trocado."); }
+    else if (b.dataset.off) { await api.post("/api/voice/rvc_off", { voice: b.dataset.off }); toast("RVC desligado para esta voz."); }
+    else if (b.dataset.studio) { showTab("studio"); return; }
+    await pollVoices();
+  } catch (er) { toast(er.message, true); }
+};
+
+// ---- polling (only while the tab is open)
+async function pollSetup() { try { SU = await api.get("/api/setup"); renderSetup(); renderTimeNote(); } catch (e) {} }
+async function pollVoices() {
+  try {
+    V = await api.get("/api/voices"); renderVoiceSel(); renderVoices();
+    const running = V.jobs.filter(j => ["queued", "running"].includes(j.status)).pop();
+    if (running && (!cJob || cJob.id !== running.id)) { cJob = running; cT0 = performance.now() - ((Date.now() / 1000 - running.created) * 1000); }
+    else if (cJob) { const j = V.jobs.find(x => x.id === cJob.id); if (j) cJob = j; }
+    renderCloneJob(); renderTimeNote();
+  } catch (e) {}
+}
+function pollClone() { pollSetup(); pollVoices(); }
+setInterval(() => { if (!document.hidden && !$("tabClone").hidden) { pollSetup(); if (!upBusy) pollVoices(); } }, 2500);
+setInterval(() => { if (cJob && ["queued", "running"].includes(cJob.status)) $("cTimer").textContent = fmtDur((performance.now() - cT0) / 1000); }, 1000);
+try { const t = localStorage.getItem("wvs.tab"); if (t === "clone") showTab("clone"); } catch (e) {}
 </script>
 </body>
 </html>

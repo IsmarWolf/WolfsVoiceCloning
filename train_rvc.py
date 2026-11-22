@@ -79,6 +79,7 @@ def main() -> int:
     ap.add_argument("--f0", default="rmvpe", choices=["rmvpe", "pm"])
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--half", default="True", choices=["True", "False"])
+    ap.add_argument("--device", default="cuda", choices=["cuda", "cpu"], help="cpu: very slow, for PCs without an NVIDIA GPU")
     ap.add_argument("--only", nargs="+", choices=STEPS)
     ap.add_argument("--skip", nargs="+", choices=STEPS, default=[])
     args = ap.parse_args()
@@ -111,15 +112,20 @@ def main() -> int:
     if "f0" in todo:
         print("\n[2/5] pitch (F0) extraction with", args.f0)
         (exp_dir / "extract_f0_feature.log").write_text("", encoding="utf-8")
-        if args.f0 == "rmvpe":
+        if args.device == "cpu":
+            run([py, "train/dataset/extract_f0.py", "cpu", fwd(exp_dir), str(args.workers), args.f0], rvc, env, log)
+        elif args.f0 == "rmvpe":
             run([py, "train/dataset/extract_f0.py", "cuda", "1", "0", args.gpu, fwd(exp_dir), args.half], rvc, env, log)
         else:
             run([py, "train/dataset/extract_f0.py", "cpu", fwd(exp_dir), str(args.workers), "pm"], rvc, env, log)
 
     if "features" in todo:
         print("\n[3/5] HuBERT features")
-        run([py, "train/dataset/extract_hubert_feature.py", f"cuda:{args.gpu}", "1", "0", args.gpu,
-             fwd(exp_dir), args.version, args.half], rvc, env, log)
+        if args.device == "cpu":
+            run([py, "train/dataset/extract_hubert_feature.py", "cpu", "1", "0", fwd(exp_dir), args.version, "False"], rvc, env, log)
+        else:
+            run([py, "train/dataset/extract_hubert_feature.py", f"cuda:{args.gpu}", "1", "0", args.gpu,
+                 fwd(exp_dir), args.version, args.half], rvc, env, log)
 
     if "train" in todo:
         print("\n[4/5] training")

@@ -78,7 +78,7 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=HERE / "out" / "checkpoints")
     args = ap.parse_args()
 
-    cfg = tomllib.loads(args.config.read_text(encoding="utf-8"))
+    cfg = narrate.portable.load_config(args.config)
     lang = args.lang or ("en" if args.engine == "gptsovits" else "pt")
     sentences = load_sentences(lang, args.sentences)
     out_root = args.out / args.engine

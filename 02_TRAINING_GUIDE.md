@@ -1,5 +1,7 @@
 # Training guide: your voice clone on an RTX 5060 Ti (16 GB, Windows)
 
+> **You no longer have to follow this guide by hand.** `studio.bat` opens the app, and its **Clonar voz** tab installs the environments, prepares your recordings, trains RVC and picks the checkpoint (see README.md for the hardware profiles and what was tested). This guide stays as the reference for what the app does, and for the optional GPT-SoVITS / F5-TTS routes, which the app does not set up.
+
 **Plan in one line:** record once, prepare once, then train **GPT-SoVITS v2Pro** for English and **RVC** for Portuguese.
 Portuguese speech comes from **Chatterbox Multilingual** (zero-shot, using your reference clip) and is passed through your RVC model.
 **F5-TTS** is the backup: fine-tune it on the same clips and compare by ear.

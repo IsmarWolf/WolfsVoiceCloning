@@ -157,6 +157,10 @@ def generate(req: dict) -> dict:
 
 
 def main() -> None:
+    if "--download" in sys.argv:  # used by the app's setup: fetch the pt-BR files and exit
+        ensure_ptbr()
+        REAL_OUT.write("downloaded\n")
+        return
     send({"event": "ready", "cuda": torch.cuda.is_available()})
     for line in sys.stdin:
         line = line.strip()

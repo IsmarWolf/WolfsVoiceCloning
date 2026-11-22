@@ -40,6 +40,10 @@ except ImportError:  # pragma: no cover
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG = HERE / "voice_config.toml"
+sys.path.insert(0, str(HERE))
+import portable  # noqa: E402
+
+portable.add_tools_to_path()
 
 
 def log(*a):
@@ -270,7 +274,7 @@ def main() -> int:
     ap.add_argument("--keep-parts", type=Path, help="also save the raw chunks to this folder")
     args = ap.parse_args()
 
-    cfg = tomllib.loads(args.config.read_text(encoding="utf-8"))
+    cfg = portable.load_config(args.config)
     g = cfg.get("general", {})
     text = args.text if args.text is not None else (
         args.text_file.read_text(encoding="utf-8") if args.text_file else sys.stdin.read())

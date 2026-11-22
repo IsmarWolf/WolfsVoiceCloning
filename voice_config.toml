@@ -1,32 +1,48 @@
-# voice_config.toml - settings for narrate.py
-# Paths assume everything lives in C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning. Change them if you put it elsewhere.
-# In TOML, single-quoted strings keep Windows backslashes as-is.
+# voice_config.toml - settings for narrate.py and the studio.
+# Every path left out is filled in automatically (see portable.py): the Python environments the app
+# created, the RVC folder, ffmpeg, and the model / index / reference clip of the ACTIVE voice
+# (the voice you cloned in the "Clonar voz" tab; its choice is remembered in settings.json).
+# Relative paths are relative to this folder.
 
 [general]
 default_lang   = "pt"
-ffmpeg         = "ffmpeg"
+ffmpeg         = "ffmpeg"  # "ffmpeg" = use the one the app downloaded, else the one on PATH
 sample_rate    = 44100
-pause_ms       = 250      # silence between sentences/chunks
-loudness_lufs  = -16      # Instagram/TikTok-friendly loudness
-speed          = 1.0      # 1.1 = 10% faster (pitch kept)
-spell_numbers  = true     # "37%" -> "trinta e sete por cento" (needs: pip install num2words)
+pause_ms       = 250       # silence between sentences/chunks
+loudness_lufs  = -16       # Instagram/TikTok-friendly loudness
+speed          = 1.0       # 1.1 = 10% faster (pitch kept)
+spell_numbers  = true      # "37%" -> "trinta e sete por cento" (needs num2words in the prep venv)
 
-[routing]                 # which engine speaks each language
-pt = "chatterbox"         # or "f5tts" once you have a fine-tuned pt checkpoint
-en = "gptsovits"
+[routing]                  # which engine speaks each language
+pt = "chatterbox"
+en = "chatterbox"          # Chatterbox multilingual v3 speaks English too; "gptsovits" is the optional advanced route
 
-# ---------------------------------------------------------------- GPT-SoVITS (English)
+# ---------------------------------------------------------------- Chatterbox (pt + en)
+[chatterbox]
+# python / device / ref_audio / rvc come from the active voice and the hardware profile
+exaggeration   = 0.5       # 0.3 calmer ... 0.7 more expressive
+cfg_weight     = 0.5       # lower (0.3) = slower, more deliberate pacing
+seed           = 0
+max_chars      = 250
+
+# ---------------------------------------------------------------- RVC post-pass (your exact timbre)
+[rvc]
+# cwd / python / model_name / index_path come from the active voice
+f0method       = "rmvpe"
+index_rate     = 0.5       # 0 = ignore the index, 1 = lean on it fully (can sound harsh)
+protect        = 0.33
+
+# ---------------------------------------------------------------- optional, NOT set up by the app
+# GPT-SoVITS (English only, advanced): install it by hand as in 02_TRAINING_GUIDE.md and use routing en = "gptsovits".
 [gptsovits]
-root           = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\GPT-SoVITS'
-python         = 'C:\Users\IsmarWolf\miniconda3\envs\GPTSoVits\python.exe'
+root           = 'GPT-SoVITS'
+python         = 'GPT-SoVITS/.venv/Scripts/python.exe'
 host           = "127.0.0.1"
 port           = 9880
 config         = 'GPT_SoVITS/configs/tts_infer.yaml'
-# your fine-tuned weights (file names appear after training; pick the latest/best epoch)
-gpt_weights    = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\GPT-SoVITS\GPT_weights_v2Pro\ismar-e15.ckpt'
-sovits_weights = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\GPT-SoVITS\SoVITS_weights_v2Pro\ismar_e8_s400.pth'
-# a clean 4-9 s clip from your dataset + its exact transcript
-ref_audio      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\wavs\session2_en_01_0007.wav'
+gpt_weights    = ''
+sovits_weights = ''
+ref_audio      = ''
 ref_text       = "Put the exact words of the reference clip here."
 ref_lang       = "en"
 top_k          = 15
@@ -36,41 +52,13 @@ repetition_penalty = 1.35
 max_chars      = 220
 rvc            = false
 
-# ---------------------------------------------------------------- Chatterbox (Portuguese)
-[chatterbox]
-python         = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\venvs\chatterbox\Scripts\python.exe'
-device         = "cuda"
-ref_audio      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\wavs\Treino_pt_01_0053.wav'
-exaggeration   = 0.5      # 0.3 calmer ... 0.7 more expressive
-cfg_weight     = 0.5      # lower (0.3) = slower, more deliberate pacing
-seed           = 0
-max_chars      = 250
-rvc            = true     # pass the output through your RVC model for your exact timbre
-
-# ---------------------------------------------------------------- F5-TTS (backup / compare)
+# F5-TTS (backup / compare), optional and NOT set up by the app.
 [f5tts]
-cli            = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\venvs\f5tts\Scripts\f5-tts_infer-cli.exe'
+cli            = 'venvs/f5tts/Scripts/f5-tts_infer-cli.exe'
 model          = "F5TTS_v1_Base"
-ckpt_file      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\F5-TTS\ckpts\ismar_pt\model_last.pt'
-vocab_file     = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\F5-TTS\data\ismar_pt_custom\vocab.txt'
-ref_audio      = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\dataset\wavs\Treino_pt_01_0053.wav'
+ckpt_file      = ''
+vocab_file     = ''
+ref_audio      = ''
 ref_text       = "texto exato do clipe de referência."
 nfe_step       = 32
 rvc            = false
-
-# ---------------------------------------------------------------- RVC post-pass
-# Uses the RVC repo's own CLI (python -m infer.cli, run inside the RVC folder).
-# {input} and {output} are filled in by narrate.py; any other {key} comes from this table.
-# model_name is a file in RVC\assets\weights - set it to the checkpoint you picked with compare_checkpoints.py.
-[rvc]
-cwd            = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\RVC'
-python         = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\RVC\.venv\Scripts\python.exe'
-model_name     = "ismar_e100_s4200.pth"
-index_path     = 'C:\Users\IsmarWolf\Projetos\WolfsVoiceCloning\RVC\assets\indices\ismar_added_IVF1983_Flat_nprobe_1_ismar_v2.index'
-f0method       = "rmvpe"
-index_rate     = 0.5      # 0 = ignore the index, 1 = lean on it fully (can sound harsh)
-protect        = 0.33
-command = ["{python}", "-W", "ignore", "-m", "infer.cli",
-           "--model", "{model_name}", "--input", "{input}", "--output", "{output}",
-           "--index", "{index_path}", "--index-rate", "{index_rate}",
-           "--f0-method", "{f0method}", "--protect", "{protect}", "--overwrite"]

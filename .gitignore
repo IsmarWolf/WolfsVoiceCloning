@@ -27,3 +27,7 @@ __pycache__/
 *.err
 .model-downloads/
 models/
+
+settings.json
+tools/
+voices/
