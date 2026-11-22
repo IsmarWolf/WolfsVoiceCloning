@@ -66,11 +66,15 @@ In the browser (http://127.0.0.1:9874):
    - Audio folder: leave **empty** (the list has full paths)
    - Click **One-click formatting** and wait for "done".
 3. **1B Fine-tuning**
-   - **SoVITS training:** batch size **8**, total epochs **8**, save every 4 epochs. Click start.
-   - **GPT training:** batch size **8**, total epochs **15**, save every 5 epochs. Leave DPO off at first. Click start.
-   - Roughly 10–25 min each for 10–15 min of English audio.
-4. **1C Inference**: refresh the model list, pick your `ismar` GPT + SoVITS weights, upload your reference clip with its text, and try a few sentences.
-   - Too robotic or mumbly? Try a different epoch. More epochs is not always better: the last GPT epoch can overfit and skip or repeat words.
+   - **Untick "save only the latest checkpoint"** and **tick "save a small final model to the weights folder at each save point"**. Otherwise you can't go back to an earlier epoch.
+   - **SoVITS training:** batch size **8**, total epochs **8**, save every **2** epochs. Click start.
+   - **GPT training:** batch size **8**, total epochs **15**, save every **5** epochs. Leave DPO off. Click start.
+   - Roughly 10–25 min each for 10–15 min of English audio. These are the project's moderate defaults. Don't raise them unless every checkpoint still sounds unlike you.
+4. **Pick checkpoints by ear (see [Avoiding overtraining](#avoiding-overtraining)):**
+   ```powershell
+   python compare_checkpoints.py gptsovits --exp ismar
+   ```
+   This renders the same 5 test sentences from every SoVITS × GPT pair into `out\checkpoints\gptsovits\`.
 
 Then copy the chosen weight paths into `[gptsovits]` in `voice_config.toml`. `narrate.py` starts `api_v2.py` itself when needed.
 
@@ -97,9 +101,15 @@ The RVC repo has a 50-series install thread: <https://github.com/RVC-Project/Ret
 `.venv\Scripts\python infer-web.py` → **Train** tab:
 - Experiment name `ismar`, target SR **40k**, pitch guidance **yes**, version **v2**
 - Training folder: `C:\Users\IsmarWolf\VoiceClone\dataset\wavs`
-- f0 method **rmvpe_gpu**, batch size **12**, epochs **200–300** (30 min of data), save every 25
+- f0 method **rmvpe_gpu**, batch size **12**, total epochs **100**, save every **10**
+- "Save only the latest ckpt": **No**. "Save a small final model to the weights folder at each save point": **Yes**. That gives you `ismar_e10_….pth`, `ismar_e20_….pth` and so on in `assets\weights`.
 - Click "One-click training". It also builds the `.index` file.
-- Test it on the **Model inference** tab with a Chatterbox output (step 3). Try a couple of saved epochs and keep the best one.
+- With ~30 min of clean audio, RVC usually sounds right somewhere around epoch 40–80. Past that it tends to get harsh and lose the natural breath. Only go beyond 100 if e100 still clearly sounds unlike you.
+- After Chatterbox is installed (step 3), compare every save point:
+  ```powershell
+  python compare_checkpoints.py rvc --exp ismar
+  ```
+  This renders the Portuguese test sentences once with Chatterbox, then passes them through each RVC checkpoint.
 
 You know RVC already. The only differences from your earlier runs are the cu128 torch and the clean dataset from step 0.
 
@@ -133,9 +143,32 @@ venvs\f5tts\Scripts\pip install f5-tts
 venvs\f5tts\Scripts\f5-tts_finetune-gradio
 ```
 In the Gradio UI: create a project, point it at `dataset\f5tts\metadata_pt.csv` (pipe-separated, absolute paths, header `audio_file|text`), and run **Prepare**.
-On **Train**, choose "finetune", set the pretrained checkpoint to the pt-BR model, and use learning rate `1e-5`, frame batch `~3000` for 16 GB, and about 50–100 epochs. Turn off EMA for early checkpoints.
+On **Train**, choose "finetune", set the pretrained checkpoint to the pt-BR model, and use learning rate `1e-5`, frame batch `~3000` for 16 GB, **30 epochs max**, and a save every few hundred updates (keep the last 10 or more). Turn off EMA for early checkpoints.
+Compare them with `python compare_checkpoints.py f5tts --ckpt-dir <its ckpts folder>`.
 Then set `[routing] pt = "f5tts"` (or run `narrate.py --engine f5tts`) to compare against Chatterbox + RVC.
 I'll fill in the exact clicks when we get there, because the UI changes between versions.
+
+---
+
+## Avoiding overtraining
+
+The rule: **train a moderate amount, save often, and keep the earliest checkpoint that sounds like you.**
+
+| Engine | Total epochs | Save every | Usually good around |
+|---|---|---|---|
+| GPT-SoVITS SoVITS | 8 | 2 | 4–8 |
+| GPT-SoVITS GPT | 15 | 5 | 10–15 |
+| RVC | 100 | 10 | 40–80 |
+| F5-TTS fine-tune | ≤30 | few hundred updates | early-middle |
+
+`compare_checkpoints.py` renders the same fixed test sentences (`test_sentences\pt.txt` and `en.txt`) from every checkpoint. Each checkpoint gets one file with all the sentences, named so they sort oldest first. Listen in that order, with headphones, at the same volume.
+
+- **Undertrained:** sounds like a generic voice, or only somewhat like you. Keep going to later checkpoints.
+- **Right:** sounds like you, words are clear, and rhythm varies naturally. **Stop here and use this one**, even if later ones exist.
+- **Overtrained:** metallic or harsh tone, words skipped or repeated, mumbling, odd breaths, or every sentence with the same sing-song rhythm. Go back one or two checkpoints.
+
+If two checkpoints sound the same, take the earlier one. It generalises better to new scripts.
+Use `--every 2` to listen to fewer checkpoints at first, then fill in around the best one.
 
 ---
 

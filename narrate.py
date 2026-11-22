@@ -152,10 +152,10 @@ def concat_and_finish(parts: list[Path], out: Path, cfg: dict, speed: float) -> 
 def rvc_convert(src: Path, dst: Path, cfg: dict) -> None:
     """Run the RVC command template from [rvc] on one file."""
     r = cfg["rvc"]
-    subs = {"input": str(src), "output": str(dst), **{k: str(v) for k, v in r.items() if not isinstance(v, (list, dict))}}
+    subs = {"input": str(Path(src).resolve()), "output": str(Path(dst).resolve()), **{k: str(v) for k, v in r.items() if not isinstance(v, (list, dict))}}
     cmd = [part.format(**subs) for part in r["command"]]
     run(cmd, cwd=r.get("cwd") or None)
-    if not dst.exists():
+    if not Path(dst).resolve().exists():
         raise RuntimeError(f"RVC did not write {dst}. Check [rvc].command in the config.")
 
 
